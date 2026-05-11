@@ -10,6 +10,12 @@ class MapParser:
         self.raw_base = {}
         self.structured_data = {}
 
+
+    def run(self):
+        self.parse_phase_one()
+        self.parse_phase_two()
+        self.handle_metadata()
+
     def parse_phase_one(self) -> None:
         """Stage 1: Categorize lines into raw strings based on prefix."""
         start_hubs = 0

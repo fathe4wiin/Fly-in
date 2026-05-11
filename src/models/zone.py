@@ -18,7 +18,12 @@ class Zone:
         max_drones: int, 
         color: Optional[str]
     ) -> None:
-        pass
+        self.name = name
+        self.x = x
+        self.y = y
+        self.z_type = z_type
+        self.max_drones = max_drones
+        self.color = color
 
 class ZoneRole(Enum):
     START = "start"

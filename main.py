@@ -1,9 +1,6 @@
 import sys
 from src.parser.map_parser import MapParser
-from src.models.network import NetworkModel
-from src.models.network import Network
-from src.models.zone import Zone, ZoneType
-from src.models.connection import Connection
+from src.parser.network_factory import create_network
 
 def main() -> None:
     # 1. Argument Validation
@@ -14,16 +11,14 @@ def main() -> None:
     map_path = sys.argv[1]
 
     try:
-        # 2. Parsing Stages
         parser = MapParser(map_path)
-        parser.parse_phase_one()
-        parser.parse_phase_two()
-        parser.handle_metadata()
+        parser.run()
 
-        # 3. Pydantic Validation
-        # This converts raw strings to types and enforces constraints
-        print(parser.structured_data)
-        # NEXT STEP: Initialize Simulation Engine and Algorithm
+        sd = parser.structured_data
+        network = create_network(sd)
+        print(f"Built network with {len(network.zones)} zones and {len(network.connections)} connections")
+        for zone in network.zones.values():
+            print(network.get_neighbors(zone))
 
     except Exception as e:
         print(f"Error: {e}")
