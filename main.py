@@ -16,9 +16,11 @@ def main() -> None:
 
         sd = parser.structured_data
         network = create_network(sd)
-        print(f"Built network with {len(network.zones)} zones and {len(network.connections)} connections")
-        for zone in network.zones.values():
-            print(network.get_neighbors(zone))
+        # print(f"Built network with {len(network.zones)} zones and {len(network.connections)} connections")
+        # for zone in network.zones.values():
+        #     print(network.get_neighbors(zone))
+
+        
 
     except Exception as e:
         print(f"Error: {e}")
