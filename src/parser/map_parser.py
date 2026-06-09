@@ -1,7 +1,5 @@
 import re
 from typing import Dict
-from enum import Enum
-from typing import Dict, List, Optional
 
 
 class MapParser:
@@ -94,6 +92,20 @@ class MapParser:
                     self.raw_base["connections_raw"].append((value, line_num))
                 else:
                     raise ValueError(f"Line {line_num}: Unknown prefix '{prefix}'")
+
+        if not self.raw_base["nb_drones"][0]:
+            raise ValueError("Missing nb_drones definition")
+        try:
+            if int(self.raw_base["nb_drones"][0]) < 1:
+                raise ValueError
+        except ValueError as exc:
+            ln = self.raw_base["nb_drones"][1]
+            raise ValueError(f"Line {ln}: nb_drones must be a positive integer") from exc
+
+        if start_hubs == 0:
+            raise ValueError("Missing start_hub definition")
+        if end_hubs == 0:
+            raise ValueError("Missing end_hub definition")
 
     def parse_phase_two(self) -> None:
         """Stage 2: Split strings into coordinate and name components."""

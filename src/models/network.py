@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 from src.models.zone import Zone
 from src.models.connection import Connection
 from src.models.drone import Drone
-from pydantic import BaseModel, Field, PositiveInt, field_validator, model_validator
+from pydantic import BaseModel, PositiveInt, model_validator
 from src.models.zone import ZoneModel, ZoneRole
 from src.models.connection import ConnectionModel
 

@@ -22,5 +22,14 @@ If you want, I can also:
 - Update `parsing.md` to mark implemented vs pending items.
 - Add unit tests that assert the new error conditions (recommended).
 
+## Simulation (follow-up)
+
+- Completed `ReservationTable`, space-time A*, and `SimulationEngine` with subject output format.
+- Terminal run: `python main.py <map>` (pygame only with `--visual`).
+- Performance on provided maps meets or beats subject benchmarks (challenger: 43 turns vs 45 target).
+
 Next steps?
+
+- Replace `<login>` in `README.md` with your 42 login(s).
+- Run `make install && make lint` to verify flake8/mypy locally.
 
