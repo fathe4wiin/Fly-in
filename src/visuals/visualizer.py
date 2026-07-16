@@ -25,8 +25,8 @@ class Visualizer:
 
     def __init__(self, network: Network) -> None:
         self.network = network
-        self.WIDTH = 1280
-        self.HEIGHT = 720
+        self.WIDTH = 1920
+        self.HEIGHT = 1080
         self.PADDING = 60
         self.graph_height = self.HEIGHT - self.CONTROL_BAR_HEIGHT
 

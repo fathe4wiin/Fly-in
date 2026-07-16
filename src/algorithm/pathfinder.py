@@ -56,6 +56,7 @@ class SpaceTimeAStar:
         ]
         visited: set[Tuple[str, int]] = set()
         max_turn_limit = 500
+        visited_zones_count: Dict[str, int] = {}  # Track how many times zone is visited in path
 
         while pq:
             _, current_turn, u_name, path = heapq.heappop(pq)
@@ -69,14 +70,27 @@ class SpaceTimeAStar:
 
             u_zone = self.network.zones[u_name]
 
+            current_h = self.h_scores.get(u_name, float("inf"))
+            
+            # Prefer moves over waits by adding a small penalty to waiting
+            # This encourages drones to explore alternative paths when congested
             wait_turn = current_turn + 1
             if self.res_table.is_zone_available(u_name, wait_turn, u_zone.max_drones):
                 new_path = path + [(u_name, wait_turn)]
                 h = self.h_scores.get(u_name, float("inf"))
-                heapq.heappush(pq, (wait_turn + h, wait_turn, u_name, new_path))
+                wait_penalty = 0.1  # Penalize waiting to prefer movement
+                heapq.heappush(pq, (wait_turn + h + wait_penalty, wait_turn, u_name, new_path))
 
             for v_zone in self.network.get_neighbors(u_zone):
                 if v_zone.z_type == ZoneType.BLOCKED:
+                    continue
+
+                v_h = self.h_scores.get(v_zone.name, float("inf"))
+                
+                # Only explore moves that make progress or maintain progress toward goal.
+                # Block strictly worse heuristics (dead ends) but allow equal heuristics (alternative paths)
+                # This prevents drones from exploring dead ends while allowing path splitting
+                if v_h > current_h:
                     continue
 
                 move_cost = 2 if v_zone.z_type == ZoneType.RESTRICTED else 1
@@ -95,6 +109,20 @@ class SpaceTimeAStar:
 
                 new_path = path + [(v_zone.name, arrival_turn)]
                 h = self.h_scores.get(v_zone.name, float("inf"))
-                heapq.heappush(pq, (arrival_turn + h, arrival_turn, v_zone.name, new_path))
+                
+                # Penalize revisiting zones to discourage backtracking
+                # Count how many times this zone appears in the path
+                revisit_count = sum(1 for zone, _ in new_path if zone == v_zone.name)
+                revisit_penalty = (revisit_count - 1) * 0.5  # 0 for first visit, 0.5 for second, 1.0 for third, etc.
+                
+                # Add occupancy bonus to encourage load balancing:
+                # Zones with more drones already in them get a small bonus (lower f-score)
+                # This helps distribute drones evenly across equally viable paths
+                occupancy_count = self.res_table.zone_usage[arrival_turn].get(v_zone.name, 0)
+                max_cap = v_zone.max_drones if v_zone.max_drones < float("inf") else 1
+                occupancy_bonus = -(occupancy_count / max_cap) * 0.03  # Negative = bonus (lower f_score)
+                
+                f_score = arrival_turn + h + revisit_penalty + occupancy_bonus
+                heapq.heappush(pq, (f_score, arrival_turn, v_zone.name, new_path))
 
         return []
