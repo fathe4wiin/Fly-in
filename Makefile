@@ -1,4 +1,4 @@
-.PHONY: help install run debug clean lint
+.PHONY: help install run run-visual debug clean lint lint-strict
 
 DEFAULT_MAP := maps/easy/01_linear_path.txt
 PYTHON := python3
@@ -13,6 +13,7 @@ help:
 	@echo "  make run-visual        Run with pygame visualization"
 	@echo "  make debug             Run under pdb"
 	@echo "  make lint              Run flake8 and mypy"
+	@echo "  make lint-strict       Run flake8 and mypy --strict"
 	@echo "  make clean             Remove Python cache files"
 
 install:
@@ -31,6 +32,10 @@ lint:
 	flake8 .
 	mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports \
 		--disallow-untyped-defs --check-untyped-defs
+
+lint-strict:
+	flake8 .
+	mypy . --strict
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

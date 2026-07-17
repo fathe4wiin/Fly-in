@@ -1,4 +1,4 @@
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Union
 
 from src.models.network import Network, NetworkModel
 from src.models.zone import Zone, ZoneModel, ZoneRole, ZoneType
@@ -6,7 +6,7 @@ from src.models.connection import Connection, ConnectionModel
 from src.models.drone import Drone
 
 
-def create_network(model_or_structured: Union[NetworkModel, Dict]) -> Network:
+def create_network(model_or_structured: Union[NetworkModel, Dict[str, Any]]) -> Network:
     """Create a runtime `Network` from either a `NetworkModel` or the
     parser's structured dictionary.
 
@@ -16,7 +16,7 @@ def create_network(model_or_structured: Union[NetworkModel, Dict]) -> Network:
     """
     # If caller passed a raw structured dict (parser output), convert it
     if not isinstance(model_or_structured, NetworkModel):
-        sd: Dict = model_or_structured
+        sd: Dict[str, Any] = model_or_structured
 
         # build pydantic zone models
         zones: Dict[str, ZoneModel] = {}
@@ -74,7 +74,10 @@ def create_network(model_or_structured: Union[NetworkModel, Dict]) -> Network:
     for conn_model in model.connections:
         zone_a = network.zones[conn_model.node_a]
         zone_b = network.zones[conn_model.node_b]
-        conn = Connection(zone_a=zone_a, zone_b=zone_b, max_link_capacity=conn_model.max_link_capacity)
+        conn = Connection(
+            zone_a=zone_a,
+            zone_b=zone_b,
+            max_link_capacity=conn_model.max_link_capacity)
         network.connections.append(conn)
 
     # instantiate drones and place them at the start hub

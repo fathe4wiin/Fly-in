@@ -43,6 +43,19 @@ class SpaceTimeAStar:
 
         return distances
 
+    def _occupancy_bonus(self, zone_name: str, max_drones: int) -> float:
+        """
+        Small negative f-score bonus for hubs already part of an established
+        route (still under capacity), so ties prefer reusing them over
+        spilling into an untouched hub. Capped at 1.0 so it can only settle
+        genuine ties (h/turn differences are always >= 0.9) and never
+        override them. Shared between "wait here" and "move to a neighbor"
+        so the two compete on equal footing.
+        """
+        max_cap = max_drones if max_drones < float("inf") else 1
+        occupancy_ratio = min(self.res_table.zone_total_usage.get(zone_name, 0) / max_cap, 1.0)
+        return -occupancy_ratio * 0.03
+
     def find_path(
         self, start_zone_name: str, end_zone_name: str, start_turn: int
     ) -> List[Tuple[str, int]]:
@@ -50,16 +63,34 @@ class SpaceTimeAStar:
         Find a collision-free space-time path for one drone.
         Returns a list of (zone_name, arrival_turn) states.
         """
+        start_zone = self.network.zones[start_zone_name]
+        if not self.res_table.is_zone_available(start_zone_name, start_turn, start_zone.max_drones):
+            # Every subsequent wait/move is capacity-checked before being
+            # queued, but this initial state never was. That's invisible when
+            # start_turn is 0 (the start hub is exempt then), but SimulationEngine
+            # retries later drones at start_turn > 0 when turn 0 didn't work out,
+            # and an earlier drone can legitimately still be waiting in the start
+            # hub at that exact turn — so this placement needs the same check.
+            return []
+
         start_h = self.h_scores.get(start_zone_name, float("inf"))
-        pq: List[Tuple[float, int, str, List[Tuple[str, int]]]] = [
-            (start_h + start_turn, start_turn, start_zone_name, [(start_zone_name, start_turn)])
+        # move_count (element 3) tracks how many *actual* hub-to-hub transitions
+        # a path has taken (waiting in place never increments it). It sits
+        # between arrival_turn and zone_name in the sort key so that when two
+        # paths are genuinely tied on (f_score, arrival_turn), the one that got
+        # there via fewer real moves wins the tie instead of falling through to
+        # an arbitrary alphabetical comparison of zone names / path contents.
+        # This is what makes "just wait one turn for the direct route to clear"
+        # beat "detour through an equally-costed neighbor hub" when both
+        # options are otherwise identical.
+        pq: List[Tuple[float, int, int, str, List[Tuple[str, int]]]] = [
+            (start_h + start_turn, start_turn, 0, start_zone_name, [(start_zone_name, start_turn)])
         ]
         visited: set[Tuple[str, int]] = set()
         max_turn_limit = 500
-        visited_zones_count: Dict[str, int] = {}  # Track how many times zone is visited in path
 
         while pq:
-            _, current_turn, u_name, path = heapq.heappop(pq)
+            _, current_turn, move_count, u_name, path = heapq.heappop(pq)
 
             if u_name == end_zone_name:
                 return path
@@ -70,29 +101,43 @@ class SpaceTimeAStar:
 
             u_zone = self.network.zones[u_name]
 
-            current_h = self.h_scores.get(u_name, float("inf"))
-            
-            # Prefer moves over waits by adding a small penalty to waiting
-            # This encourages drones to explore alternative paths when congested
+            # Waiting competes with moving on equal footing: same occupancy
+            # bonus, no artificial penalty. A flat "prefer moves" penalty used
+            # to make ties always resolve in favor of movement, so drones would
+            # take equal-cost detours through extra hubs (burning shared zone
+            # and connection capacity other drones might need) instead of
+            # simply waiting one turn for a busy direct route to free up.
             wait_turn = current_turn + 1
             if self.res_table.is_zone_available(u_name, wait_turn, u_zone.max_drones):
                 new_path = path + [(u_name, wait_turn)]
                 h = self.h_scores.get(u_name, float("inf"))
-                wait_penalty = 0.1  # Penalize waiting to prefer movement
-                heapq.heappush(pq, (wait_turn + h + wait_penalty, wait_turn, u_name, new_path))
+                wait_bonus = self._occupancy_bonus(u_name, u_zone.max_drones)
+                heapq.heappush(
+                    pq,
+                    (wait_turn +
+                     h +
+                     wait_bonus,
+                     wait_turn,
+                     move_count,
+                     u_name,
+                     new_path))
 
             for v_zone in self.network.get_neighbors(u_zone):
                 if v_zone.z_type == ZoneType.BLOCKED:
                     continue
 
-                v_h = self.h_scores.get(v_zone.name, float("inf"))
-                
-                # Only explore moves that make progress or maintain progress toward goal.
-                # Block strictly worse heuristics (dead ends) but allow equal heuristics (alternative paths)
-                # This prevents drones from exploring dead ends while allowing path splitting
-                if v_h > current_h:
-                    continue
-
+                # Deliberately no "only explore if this neighbor's heuristic is no
+                # worse than the current zone's" filter here. That used to
+                # permanently ban any neighbor whose static per-zone heuristic
+                # looked worse than the current one — but a neighbor can
+                # have a worse standalone heuristic and *still* be exactly as good
+                # once you account for real congestion (e.g. every other gate is
+                # momentarily busy, so waiting costs exactly as much as detouring
+                # through the "worse" gate). The f-score below already accounts
+                # for real arrival turn + heuristic, so it naturally deprioritizes
+                # genuinely bad options (dead ends included) without permanently
+                # forbidding ones that turn out to be competitive; visited-set and
+                # max_turn_limit already bound the search.
                 move_cost = 2 if v_zone.z_type == ZoneType.RESTRICTED else 1
                 arrival_turn = current_turn + move_cost
 
@@ -107,22 +152,33 @@ class SpaceTimeAStar:
                     if not self.res_table.is_connection_available(connection, transit_turn):
                         continue
 
-                new_path = path + [(v_zone.name, arrival_turn)]
+                # Restricted moves are explicitly recorded as two path entries:
+                # first the connection label at the transit turn (the subject
+                # requires the drone to be shown occupying the connection,
+                # never "nowhere"), then the real zone at the arrival turn.
+                # This makes every turn have a first-class, explicit state
+                # instead of leaving a gap that downstream code has to infer
+                # from the arrival-turn delta.
+                if move_cost == 2:
+                    transit_label = f"{u_name}-{v_zone.name}"
+                    new_path = path + [(transit_label, current_turn + 1),
+                                       (v_zone.name, arrival_turn)]
+                else:
+                    new_path = path + [(v_zone.name, arrival_turn)]
                 h = self.h_scores.get(v_zone.name, float("inf"))
-                
+
                 # Penalize revisiting zones to discourage backtracking
                 # Count how many times this zone appears in the path
                 revisit_count = sum(1 for zone, _ in new_path if zone == v_zone.name)
-                revisit_penalty = (revisit_count - 1) * 0.5  # 0 for first visit, 0.5 for second, 1.0 for third, etc.
-                
-                # Add occupancy bonus to encourage load balancing:
-                # Zones with more drones already in them get a small bonus (lower f-score)
-                # This helps distribute drones evenly across equally viable paths
-                occupancy_count = self.res_table.zone_usage[arrival_turn].get(v_zone.name, 0)
-                max_cap = v_zone.max_drones if v_zone.max_drones < float("inf") else 1
-                occupancy_bonus = -(occupancy_count / max_cap) * 0.03  # Negative = bonus (lower f_score)
-                
+                # 0 for first visit, 0.5 for second, 1.0 for third, etc.
+                revisit_penalty = (revisit_count - 1) * 0.5
+
+                # See _occupancy_bonus: prefer hubs already part of an
+                # established route (with room) over spilling into an
+                # untouched one, on genuine ties only.
+                occupancy_bonus = self._occupancy_bonus(v_zone.name, v_zone.max_drones)
+
                 f_score = arrival_turn + h + revisit_penalty + occupancy_bonus
-                heapq.heappush(pq, (f_score, arrival_turn, v_zone.name, new_path))
+                heapq.heappush(pq, (f_score, arrival_turn, move_count + 1, v_zone.name, new_path))
 
         return []

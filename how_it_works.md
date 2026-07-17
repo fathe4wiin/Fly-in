@@ -355,5 +355,7 @@ See `maps/README.md` for difficulty tiers and benchmarks.
 |------|----------|
 | `parsing.md` | Parser requirements checklist |
 | `parsing_changes.md` | Parser implementation notes |
+| `splitting_analysis.md` | Why some equal-cost forks (e.g. `hard/01_maze_nightmare.txt`) are deliberately left unsplit, and when splitting across parallel routes actually helps vs. just adds risk |
+| `session_changes.md` | Log of AI-assisted fixes made across the debugging session, plus a full subject compliance audit (parser error coverage, lint/type cleanliness, benchmarks) |
 | `todo.md` | Feature / phase completion tracker |
 | `README.md` | 42 README template, install, run commands |

@@ -48,7 +48,7 @@ def render_text(
         bbox = font.getbbox(text)
         w = bbox[2] - bbox[0] + pad * 2
         h = bbox[3] - bbox[1] + pad * 2
-        img = Image.new("RGBA", (max(w, 1), max(h, 1)), (0, 0, 0, 0))
+        img = Image.new("RGBA", (int(max(w, 1)), int(max(h, 1))), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         ox, oy = pad - bbox[0], pad - bbox[1]
         for dx in range(-outline_width, outline_width + 1):
@@ -62,7 +62,7 @@ def render_text(
         w = bbox[2] - bbox[0]
         h = bbox[3] - bbox[1]
         fill: Tuple[int, ...] = bg if bg is not None else (0, 0, 0, 0)
-        img = Image.new("RGBA", (max(w, 1), max(h, 1)), fill)
+        img = Image.new("RGBA", (int(max(w, 1)), int(max(h, 1))), fill)
         draw = ImageDraw.Draw(img)
         draw.text((-bbox[0], -bbox[1]), text, font=font, fill=rgb + (255,))
 

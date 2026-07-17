@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import sys
 from typing import Dict, List, Optional, Tuple
 
@@ -8,6 +9,12 @@ import pygame
 from src.models.network import Network
 from src.models.zone import ZoneType
 from src.visuals.text_render import drone_display_number, render_text
+
+# Flip this to True/False to control whether the per-zone F cost overlay
+# (heuristic turns-to-goal, shown next to "max N") is visible when the
+# visualizer window first opens. Can still be toggled at runtime with the
+# "C" key regardless of this default.
+SHOW_F_COST_ON_START: bool = True
 
 
 class _Button:
@@ -55,6 +62,16 @@ class Visualizer:
         self._buttons: List[_Button] = []
         self._running = True
         self._build_buttons()
+
+        # Per-zone F cost (heuristic turns-to-goal) overlay. Starting state
+        # comes from SHOW_F_COST_ON_START at the top of this file; toggle at
+        # runtime with the "C" key. Populated via set_zone_costs().
+        self.zone_costs: Dict[str, float] = {}
+        self.show_cost_overlay: bool = SHOW_F_COST_ON_START
+
+    def set_zone_costs(self, zone_costs: Dict[str, float]) -> None:
+        """Provide the per-zone F cost values shown by the cost overlay."""
+        self.zone_costs = zone_costs
 
     def _blit_text(
         self,
@@ -134,6 +151,11 @@ class Visualizer:
             self._go_first()
         elif key == pygame.K_END:
             self._go_last()
+        elif key == pygame.K_c:
+            self._toggle_cost_overlay()
+
+    def _toggle_cost_overlay(self) -> None:
+        self.show_cost_overlay = not self.show_cost_overlay
 
     def _on_click(self, pos: Tuple[int, int]) -> None:
         for btn in self._buttons:
@@ -224,7 +246,7 @@ class Visualizer:
         for zone in self.network.zones.values():
             pos = self._to_screen(zone.x, zone.y)
 
-            color = self.DEFAULT_HUB_COLOR
+            color: Tuple[int, int, int] | pygame.Color = self.DEFAULT_HUB_COLOR
             if zone.color:
                 try:
                     color = pygame.Color(zone.color)
@@ -239,20 +261,71 @@ class Visualizer:
 
             pygame.draw.circle(self.screen, color, pos, radius)
 
-            self._blit_text(zone.name, (pos[0], pos[1] + 28), 14, self.TEXT_COLOR, bold=True, center=True)
+            self._blit_text(zone.name, (pos[0], pos[1] + 28), 14,
+                            self.TEXT_COLOR, bold=True, center=True)
 
+            # Stack optional overlay labels above the hub, closest first, so
+            # they never sit on top of each other regardless of which are on.
+            overlay_y = pos[1] - 36
             if zone.max_drones > 1:
                 self._blit_text(
                     f"max {zone.max_drones}",
-                    (pos[0], pos[1] - 36),
+                    (pos[0], overlay_y),
                     12,
                     (180, 180, 200),
                     center=True,
                 )
+                overlay_y -= 16
+
+            if self.show_cost_overlay and zone.name in self.zone_costs:
+                cost = self.zone_costs[zone.name]
+                cost_text = "inf" if cost == float("inf") else f"F:{cost:g}"
+                self._blit_text(
+                    cost_text,
+                    (pos[0], overlay_y),
+                    12,
+                    (255, 210, 120),
+                    bold=True,
+                    center=True,
+                )
+
+    def _drone_cluster_radius(self, count: int) -> int:
+        """Shrink drone radius as more drones stack on the same hub/connection.
+
+        Keeps large clusters (e.g. 25 drones sharing a start/end hub) visually
+        bounded instead of growing without limit.
+        """
+        if count <= 6:
+            return 16
+        if count <= 12:
+            return 12
+        if count <= 20:
+            return 9
+        return 7
+
+    def _cluster_offsets(self, count: int, spacing: int) -> List[Tuple[int, int]]:
+        """Bounded grid layout (roughly square) centered on the hub position.
+
+        Replaces a naive single-column vertical stack, which pushes drones
+        off-screen once more than ~9 of them share the same location (e.g.
+        the challenger map's 25-drone start/end hubs).
+        """
+        cols = max(1, math.ceil(math.sqrt(count)))
+        rows = math.ceil(count / cols)
+        offsets = []
+        for i in range(count):
+            row, col = divmod(i, cols)
+            offset_x = (col - (cols - 1) / 2) * spacing
+            offset_y = (row - (rows - 1) / 2) * spacing
+            offsets.append((int(offset_x), int(offset_y)))
+        return offsets
 
     def _draw_drones(self) -> None:
-        occupancy: Dict[str, int] = {}
+        groups: Dict[str, List[str]] = {}
         for d_id, location in self.drone_positions.items():
+            groups.setdefault(location, []).append(d_id)
+
+        for location, d_ids in groups.items():
             if location in self.network.zones:
                 zone = self.network.zones[location]
                 pos = self._to_screen(zone.x, zone.y)
@@ -262,27 +335,30 @@ class Visualizer:
                     continue
                 pos = mid
 
-            offset = occupancy.get(location, 0)
-            cx, cy = pos[0], pos[1] - offset * 22
-            occupancy[location] = offset + 1
+            count = len(d_ids)
+            radius = self._drone_cluster_radius(count)
+            spacing = radius * 2 + 3
+            offsets = self._cluster_offsets(count, spacing)
 
-            radius = 16
-            pygame.draw.circle(self.screen, self.DRONE_RING, (cx, cy), radius + 2)
-            pygame.draw.circle(self.screen, self.DRONE_FILL, (cx, cy), radius)
-            pygame.draw.circle(self.screen, (255, 255, 255), (cx, cy), radius, width=2)
+            for d_id, (dx, dy) in zip(d_ids, offsets):
+                cx, cy = pos[0] + dx, pos[1] + dy
 
-            number = drone_display_number(d_id)
-            font_size = 20 if len(number) <= 2 else 16
-            self._blit_text(
-                number,
-                (cx, cy),
-                font_size,
-                (20, 20, 30),
-                bold=True,
-                center=True,
-                outline=(255, 255, 255),
-                outline_width=2,
-            )
+                pygame.draw.circle(self.screen, self.DRONE_RING, (cx, cy), radius + 2)
+                pygame.draw.circle(self.screen, self.DRONE_FILL, (cx, cy), radius)
+                pygame.draw.circle(self.screen, (255, 255, 255), (cx, cy), radius, width=2)
+
+                number = drone_display_number(d_id)
+                font_size = min(20 if len(number) <= 2 else 16, radius + 4)
+                self._blit_text(
+                    number,
+                    (cx, cy),
+                    font_size,
+                    (20, 20, 30),
+                    bold=True,
+                    center=True,
+                    outline=(255, 255, 255),
+                    outline_width=2,
+                )
 
     def _draw_button_icon(self, btn: _Button) -> None:
         color = self.BTN_ACTIVE if btn.hovered else self.BTN_COLOR
@@ -292,17 +368,18 @@ class Visualizer:
         cx, cy = btn.rect.centerx, btn.rect.centery
         s = 10
         if btn.action == "first":
+            left = btn.rect.left
             pygame.draw.polygon(
                 self.screen,
                 self.TEXT_COLOR,
-                [(btn.rect.left + 14, cy), (btn.rect.left + 14 + s, cy - s), (btn.rect.left + 14 + s, cy + s)],
+                [(left + 14, cy), (left + 14 + s, cy - s), (left + 14 + s, cy + s)],
             )
             pygame.draw.polygon(
                 self.screen,
                 self.TEXT_COLOR,
-                [(btn.rect.left + 26, cy), (btn.rect.left + 26 + s, cy - s), (btn.rect.left + 26 + s, cy + s)],
+                [(left + 26, cy), (left + 26 + s, cy - s), (left + 26 + s, cy + s)],
             )
-            pygame.draw.rect(self.screen, self.TEXT_COLOR, (btn.rect.left + 12, cy - 2, 4, 4))
+            pygame.draw.rect(self.screen, self.TEXT_COLOR, (left + 12, cy - 2, 4, 4))
         elif btn.action == "prev":
             pygame.draw.polygon(
                 self.screen,
@@ -316,22 +393,24 @@ class Visualizer:
                 [(cx + s // 2, cy), (cx - s // 2, cy - s), (cx - s // 2, cy + s)],
             )
         elif btn.action == "last":
+            right = btn.rect.right
             pygame.draw.polygon(
                 self.screen,
                 self.TEXT_COLOR,
-                [(btn.rect.right - 14, cy), (btn.rect.right - 14 - s, cy - s), (btn.rect.right - 14 - s, cy + s)],
+                [(right - 14, cy), (right - 14 - s, cy - s), (right - 14 - s, cy + s)],
             )
             pygame.draw.polygon(
                 self.screen,
                 self.TEXT_COLOR,
-                [(btn.rect.right - 26, cy), (btn.rect.right - 26 - s, cy - s), (btn.rect.right - 26 - s, cy + s)],
+                [(right - 26, cy), (right - 26 - s, cy - s), (right - 26 - s, cy + s)],
             )
-            pygame.draw.rect(self.screen, self.TEXT_COLOR, (btn.rect.right - 16, cy - 2, 4, 4))
+            pygame.draw.rect(self.screen, self.TEXT_COLOR, (right - 16, cy - 2, 4, 4))
 
     def _draw_control_bar(self) -> None:
         bar = pygame.Rect(0, self.graph_height, self.WIDTH, self.CONTROL_BAR_HEIGHT)
         pygame.draw.rect(self.screen, self.BAR_COLOR, bar)
-        pygame.draw.line(self.screen, self.ACCENT, (0, self.graph_height), (self.WIDTH, self.graph_height), 2)
+        pygame.draw.line(self.screen, self.ACCENT, (0, self.graph_height),
+                         (self.WIDTH, self.graph_height), 2)
 
         mx, my = pygame.mouse.get_pos()
         for btn in self._buttons:
@@ -362,9 +441,25 @@ class Visualizer:
             pygame.draw.rect(self.screen, (50, 50, 70), track, border_radius=3)
             pygame.draw.rect(self.screen, self.ACCENT, fill, border_radius=3)
 
-        hint = "← → step   Home/End   Space = forward"
+        hint = "← → step   Home/End   Space = forward   C = toggle F cost"
         hint_surf = render_text(hint, 12, (120, 130, 150))
-        self.screen.blit(hint_surf, (self.WIDTH - hint_surf.get_width() - 24, self.graph_height + 10))
+        self.screen.blit(
+            hint_surf,
+            (self.WIDTH -
+             hint_surf.get_width() -
+             24,
+             self.graph_height +
+             10))
+
+        cost_state = "ON" if self.show_cost_overlay else "OFF"
+        cost_color = (255, 210, 120) if self.show_cost_overlay else (120, 130, 150)
+        self._blit_text(
+            f"F cost: {cost_state}",
+            (self.WIDTH - 140, self.graph_height + 34),
+            13,
+            cost_color,
+            bold=self.show_cost_overlay,
+        )
 
     def render(self) -> None:
         graph_rect = pygame.Rect(0, 0, self.WIDTH, self.graph_height)

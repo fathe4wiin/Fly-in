@@ -1,12 +1,15 @@
 from typing import Dict, List, Optional
-from src.models.zone import Zone
-from src.models.connection import Connection
-from src.models.drone import Drone
+
 from pydantic import BaseModel, PositiveInt, model_validator
-from src.models.zone import ZoneModel, ZoneRole
-from src.models.connection import ConnectionModel
+
+from src.models.connection import Connection, ConnectionModel
+from src.models.drone import Drone
+from src.models.zone import Zone, ZoneModel, ZoneRole
+
 
 class Network:
+    """Hand-rolled graph of zones and connections, plus the drone fleet."""
+
     def __init__(self) -> None:
         self.zones: Dict[str, Zone] = {}
         self.connections: List[Connection] = []
@@ -14,9 +17,8 @@ class Network:
         self.start_zone: Optional[Zone] = None
         self.end_zone: Optional[Zone] = None
 
-
     def get_neighbors(self, zone: Zone) -> List[Zone]:
-        # Logic to iterate connections and find nodes adjacent to 'zone'
+        """Return every zone directly connected to `zone`."""
         neighbors = []
         for connection in self.connections:
             if connection.zone_a == zone:
@@ -26,7 +28,7 @@ class Network:
         return neighbors
 
     def get_connection(self, zone_a: Zone, zone_b: Zone) -> Optional[Connection]:
-        # Logic to find the specific connection between two names/objects
+        """Return the connection between `zone_a` and `zone_b`, if any."""
         for connection in self.connections:
             if (
                 (connection.zone_a == zone_a and connection.zone_b == zone_b)
@@ -37,12 +39,15 @@ class Network:
 
 
 class NetworkModel(BaseModel):
+    """Pydantic validation model for the whole parsed network."""
+
     nb_drones: PositiveInt
     zones: Dict[str, ZoneModel]
     connections: List[ConnectionModel]
 
     @model_validator(mode="after")
     def validate_integrity(self) -> "NetworkModel":
+        """Cross-field checks pydantic's per-field validation can't express."""
         # 1. Check for presence of required hub roles
         roles = [z.role for z in self.zones.values()]
         if ZoneRole.START not in roles:

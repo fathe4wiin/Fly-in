@@ -14,9 +14,17 @@ class ReservationTable:
         self.conn_usage: Dict[int, Dict[Tuple[str, str], int]] = defaultdict(
             lambda: defaultdict(int)
         )
+        # Cumulative reservations per zone across *all* turns. Unlike zone_usage
+        # (which is keyed per turn and only says whether a zone is full at one
+        # specific instant), this tracks whether a zone is already part of an
+        # established route at all, regardless of which turn each drone passes
+        # through it. Used to bias tie-breaks toward reusing hubs that already
+        # have capacity committed instead of spilling into untouched ones.
+        self.zone_total_usage: Dict[str, int] = defaultdict(int)
 
     def _connection_key(self, connection: Connection) -> Tuple[str, str]:
-        return tuple(sorted((connection.zone_a.name, connection.zone_b.name)))
+        name_a, name_b = sorted((connection.zone_a.name, connection.zone_b.name))
+        return (name_a, name_b)
 
     def is_zone_available(self, zone_name: str, turn: int, max_cap: int) -> bool:
         if self.network.end_zone and zone_name == self.network.end_zone.name:
@@ -35,18 +43,38 @@ class ReservationTable:
 
     def reserve_zone(self, zone_name: str, turn: int) -> None:
         self.zone_usage[turn][zone_name] += 1
+        self.zone_total_usage[zone_name] += 1
 
     def reserve_connection(self, connection: Connection, turn: int) -> None:
         key = self._connection_key(connection)
         self.conn_usage[turn][key] += 1
 
+    def _connection_from_label(self, label: str) -> Connection | None:
+        """Resolve a "zoneA-zoneB" transit label (see SpaceTimeAStar.find_path)
+        back to its Connection object."""
+        if "-" not in label:
+            return None
+        zone_a_name, zone_b_name = label.split("-", 1)
+        if zone_a_name not in self.network.zones or zone_b_name not in self.network.zones:
+            return None
+        return self.network.get_connection(
+            self.network.zones[zone_a_name], self.network.zones[zone_b_name]
+        )
+
     def reserve_path(self, path: List[Tuple[str, int]]) -> None:
-        """Reserve all zone and connection slots used by a space-time path."""
+        """Reserve all zone and connection slots used by a space-time path.
+
+        A path entry is either a real zone name (occupying that zone at that
+        turn) or a "zoneA-zoneB" transit label (occupying that connection at
+        that turn, while in flight toward a restricted zone). Only real zones
+        consume zone capacity.
+        """
         if not path:
             return
 
-        for zone_name, turn in path:
-            self.reserve_zone(zone_name, turn)
+        for name, turn in path:
+            if name in self.network.zones:
+                self.reserve_zone(name, turn)
 
         for i in range(len(path) - 1):
             z0, t0 = path[i]
@@ -54,13 +82,18 @@ class ReservationTable:
             if z0 == z1:
                 continue
 
-            zone_a = self.network.zones[z0]
-            zone_b = self.network.zones[z1]
-            connection = self.network.get_connection(zone_a, zone_b)
-            if connection is None:
+            if z0 in self.network.zones and z1 in self.network.zones:
+                # Single-turn move directly between two real zones.
+                connection = self.network.get_connection(
+                    self.network.zones[z0], self.network.zones[z1]
+                )
+            elif z0 in self.network.zones:
+                # z1 is the transit label for a restricted move starting here.
+                connection = self._connection_from_label(z1)
+            else:
+                # z0 is a transit label; the connection was already reserved
+                # when it was pushed above (arriving at z1 reserves no link).
                 continue
 
-            if t1 - t0 == 1:
-                self.reserve_connection(connection, t0 + 1)
-            elif t1 - t0 == 2:
-                self.reserve_connection(connection, t0 + 1)
+            if connection is not None:
+                self.reserve_connection(connection, t1)

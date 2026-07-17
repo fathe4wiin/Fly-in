@@ -4,6 +4,8 @@ import sys
 from src.parser.map_parser import MapParser
 from src.parser.network_factory import create_network
 from src.simulation.engine import SimulationEngine
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fly-in drone routing simulation")
     parser.add_argument("map_file", help="Path to a .map / .txt map file")

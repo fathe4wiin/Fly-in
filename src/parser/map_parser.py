@@ -1,15 +1,22 @@
 import re
-from typing import Dict
+from typing import Any, Dict, Set, Tuple
 
 
 class MapParser:
+    """Three-phase parser for the Fly-in `.map` file format.
+
+    Reads a map file line by line, raising `ValueError` (tagged with the
+    offending line number) on any structural or syntax problem, per the
+    subject's parser constraints (VII.4).
+    """
+
     def __init__(self, file_path: str) -> None:
         self.file_path = file_path
-        self.raw_base = {}
-        self.structured_data = {}
+        self.raw_base: Dict[str, Any] = {}
+        self.structured_data: Dict[str, Any] = {}
 
-
-    def run(self):
+    def run(self) -> None:
+        """Run all three parsing phases in order."""
         self.parse_phase_one()
         self.parse_phase_two()
         self.handle_metadata()
@@ -37,7 +44,7 @@ class MapParser:
                 clean_line = line.strip()
                 if not clean_line or clean_line.startswith("#"):
                     continue
-                
+
                 prefix, _, value = clean_line.partition(":")
                 prefix = prefix.strip()
                 value = value.strip()
@@ -80,13 +87,17 @@ class MapParser:
 
                     if node_a not in encountered_zones or node_b not in encountered_zones:
                         raise ValueError(
-                            f"Line {line_num}: Connection references undefined zone(s): {node_a},{node_b}"
+                            f"Line {line_num}: Connection references undefined "
+                            f"zone(s): {node_a},{node_b}"
                         )
 
                     edge_key = tuple(sorted((node_a, node_b)))
                     edge_id = (edge_key[0], edge_key[1])
                     if frozenset(edge_id) in seen_edges:
-                        raise ValueError(f"Line {line_num}: Duplicate/bidirectional connection: {node_a}-{node_b}")
+                        raise ValueError(
+                            f"Line {line_num}: Duplicate/bidirectional "
+                            f"connection: {node_a}-{node_b}"
+                        )
                     seen_edges.add(frozenset(edge_id))
 
                     self.raw_base["connections_raw"].append((value, line_num))
@@ -109,17 +120,18 @@ class MapParser:
 
     def parse_phase_two(self) -> None:
         """Stage 2: Split strings into coordinate and name components."""
+        raw_nb_drones = self.raw_base["nb_drones"]
+        nb_drones = raw_nb_drones[0] if isinstance(raw_nb_drones, tuple) else raw_nb_drones
         self.structured_data = {
-            "nb_drones": self.raw_base["nb_drones"][0] if isinstance(self.raw_base["nb_drones"], tuple) else self.raw_base["nb_drones"],
+            "nb_drones": nb_drones,
             "zones": {},
             "connections": []
         }
 
         # Process all hubs (including start/end)
-        def _unpack_hub(entry):
-            # entry may be (raw_str, line_num) or ("", 0)
+        def _unpack_hub(entry: Tuple[str, int]) -> Tuple[str, int]:
             if not entry or entry == ("", 0):
-                return ("", "", 0)
+                return ("", 0)
             raw_str, ln = entry
             return (raw_str, ln)
 
@@ -195,7 +207,7 @@ class MapParser:
                 allowed = {"max_link_capacity"}
                 entry.update(self._meta_to_dict(meta_str, allowed, ln))
 
-    def _meta_to_dict(self, meta_str: str, allowed_keys: set, line_num: int) -> Dict[str, str]:
+    def _meta_to_dict(self, meta_str: str, allowed_keys: Set[str], line_num: int) -> Dict[str, str]:
         """Helper to transform '[k=v k=v]' string into a dictionary and validate keys.
 
         Ensures every token inside the brackets matches `key=value` and that keys
@@ -220,4 +232,3 @@ class MapParser:
             result[k] = v
 
         return result
-
