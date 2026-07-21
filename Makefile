@@ -23,7 +23,7 @@ run: install
 	$(PYTHON) main.py $(MAP)
 
 run-visual: install
-	$(PYTHON) main.py $(MAP) --visual
+	$(PYTHON) main.py $(MAP)
 
 debug: install
 	$(PYTHON) -m pdb main.py $(MAP)

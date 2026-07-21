@@ -8,7 +8,6 @@ This document explains the full program flow starting from `main.py`, through pa
 
 ```bash
 python3 main.py maps/easy/01_linear_path.txt          # terminal only
-python3 main.py maps/easy/01_linear_path.txt --visual # + pygame playback
 make run MAP=maps/medium/01_dead_end_trap.txt
 make run-visual
 ```
@@ -29,9 +28,6 @@ flowchart TD
     H --> I[ReservationTable]
     F --> J[_build_turn_events]
     J --> K[print terminal lines]
-    F --> L{--visual?}
-    L -->|yes| M[Visualizer.run_playback]
-    L -->|no| N[done]
 ```
 
 ---
@@ -42,7 +38,6 @@ flowchart TD
 
 1. **Parse CLI arguments**
    - `map_file` (required): path to a map (`.txt` under `maps/`)
-   - `--visual` (optional): open the pygame viewer after planning
 
 2. **Parse the map file** → `MapParser(map_file).run()`
 
@@ -57,7 +52,6 @@ main.py
   ├── MapParser          (src/parser/map_parser.py)
   ├── create_network     (src/parser/network_factory.py)
   └── SimulationEngine   (src/simulation/engine.py)
-        └── Visualizer?  (src/visuals/visualizer.py, only with --visual)
 ```
 
 ---
@@ -195,9 +189,6 @@ D1-goal D2-waypoint2
 - Prints summary comments: total turns, average per drone
 - Drones that reached `end_hub` are no longer tracked after that (handled implicitly by paths ending at goal)
 
-### 4.4 Visualization frames — `_build_frames()`
-
-If `--visual` was passed, the engine precomputes **every turn’s drone positions** for the UI:
 
 - Turn `0`: initial layout at start
 - Later turns: zone name, or `zoneA-zoneB` while crossing a restricted link

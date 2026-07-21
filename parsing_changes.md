@@ -25,7 +25,7 @@ If you want, I can also:
 ## Simulation (follow-up)
 
 - Completed `ReservationTable`, space-time A*, and `SimulationEngine` with subject output format.
-- Terminal run: `python main.py <map>` (pygame only with `--visual`).
+- Terminal run: `python main.py <map>` starts the simulation with terminal-only output.
 - Performance on provided maps meets or beats subject benchmarks (challenger: 43 turns vs 45 target).
 
 Next steps?
