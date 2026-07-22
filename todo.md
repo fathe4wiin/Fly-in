@@ -52,3 +52,4 @@
 - color value error
 - color rainbow
 - color default shouldbe transparent
+- implemet the `--benchmark` flag to see the benchmark of the network

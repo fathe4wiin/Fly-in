@@ -14,6 +14,10 @@ def main() -> None:
         action="store_true",
         help="Open pygame visualization (off by default for terminal output)",
     )
+    parser.add_argument(
+        "--benchmark",
+        action="store_true"
+    )
     args = parser.parse_args()
 
     try:
@@ -28,7 +32,8 @@ def main() -> None:
             from src.visuals.visualizer import Visualizer
 
             visualizer = Visualizer(network)
-        engine = SimulationEngine(network, nb_drones, visualizer)
+        benchmark_flag = True if args.benchmark else False
+        engine = SimulationEngine(network, nb_drones, visualizer, benchmark_flag=benchmark_flag)
         engine.run()
 
     except Exception as e:

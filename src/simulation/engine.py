@@ -11,6 +11,7 @@ class SimulationEngine:
         network: Network,
         nb_drones: int,
         visualizer: Any | None = None,
+        benchmark_flag: bool = False
     ) -> None:
         self.network = network
         self.nb_drones = nb_drones
@@ -18,6 +19,7 @@ class SimulationEngine:
         self.res_table = ReservationTable(network)
         self.pathfinder = SpaceTimeAStar(network, self.res_table)
         self.drone_paths: Dict[str, List[Tuple[str, int]]] = {}
+        self.benchmark_flag = benchmark_flag
 
         if self.visualizer is not None:
             self.visualizer.set_zone_costs(self.pathfinder.h_scores)
@@ -42,13 +44,7 @@ class SimulationEngine:
             self.drone_paths[drone.drone_id] = path
 
     def _build_turn_events(self) -> Dict[int, List[str]]:
-        """Map simulation turns to movement tokens (D<ID>-<zone|connection>).
-
-        Each path entry is already an explicit state for its turn (a real
-        zone, or a "zoneA-zoneB" transit label while in flight toward a
-        restricted zone — see SpaceTimeAStar.find_path), so every state
-        change simply becomes a D<ID>-<state> token at that turn.
-        """
+        """Map simulation turns to movement tokens (D<ID>-<zone|connection>)."""
         events: Dict[int, List[str]] = {}
 
         for drone in self.network.drones:
@@ -56,7 +52,7 @@ class SimulationEngine:
             label = f"D{drone.drone_id}"
 
             for i in range(len(path) - 1):
-                z0, t0 = path[i]
+                z0, _t0 = path[i]
                 z1, t1 = path[i + 1]
                 if z0 == z1:
                     continue
@@ -65,20 +61,21 @@ class SimulationEngine:
         return events
 
     def _drone_positions_at_turn(self, turn: int) -> Dict[str, str]:
-        """Each drone's explicit state (zone, or in-flight connection label)
-        as of the given turn, read directly from its planned path."""
+        """Each drone's explicit state at the given turn."""
         positions: Dict[str, str] = {}
 
         for drone in self.network.drones:
             label = f"D{drone.drone_id}"
             path = self.drone_paths.get(drone.drone_id, [])
             state_at_turn = None
+
             for state, arrival in path:
                 if arrival <= turn:
-                    state_at_turn = state 
+                    state_at_turn = state
 
             if state_at_turn:
                 positions[label] = state_at_turn
+
         return positions
 
     def _build_frames(self, max_turn: int) -> List[Dict[str, str]]:
@@ -97,6 +94,9 @@ class SimulationEngine:
         for turn in range(1, max_turn + 1):
             if turn in events:
                 print(" ".join(events[turn]))
+                if self.benchmark_flag:
+                    self._benchmark(turn)
+
 
         total_turns = max_turn
         avg_turns = total_turns / self.nb_drones if self.nb_drones else 0.0
@@ -107,3 +107,23 @@ class SimulationEngine:
             frames = self._build_frames(max_turn)
             self.visualizer.load_playback(frames, events, max_turn)
             self.visualizer.run_playback()
+
+    def _benchmark(self, turn):
+        positions = self._drone_positions_at_turn(turn)
+        print(f"**** {positions}")
+
+        counts: Dict[str, int] = {}
+        for dest in positions.values():
+            counts[dest] = counts.get(dest, 0) + 1
+
+        for zone in self.network.zones.values():
+            cur = counts.get(zone.name, 0)
+            print(f"# {zone.name}: {cur}/{zone.max_drones}")
+
+        for connection in self.network.connections:
+            key = f"{connection.zone_a.name}-{connection.zone_b.name}"
+            cur = counts.get(key, 0)
+            print(
+                f"# {connection.zone_a.name}-{connection.zone_b.name}: "
+                f"{cur}/{connection.max_link_capacity}"
+            )
