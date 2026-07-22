@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Tuple
 from src.algorithm.pathfinder import SpaceTimeAStar
 from src.algorithm.reservation_table import ReservationTable
 from src.models.network import Network
+from src.models.zone import Zone
+from src.models.connection import Connection
 
 
 class SimulationEngine:
@@ -92,11 +94,35 @@ class SimulationEngine:
         max_turn = max(events.keys())
 
         for turn in range(1, max_turn + 1):
-            if turn in events:
-                print(" ".join(events[turn]))
-                if self.benchmark_flag:
-                    self._benchmark(turn)
+            if turn not in events:
+                continue
 
+            # Build occupancy counts
+            counts = self._benchmark(turn)
+
+            # Print each event followed by its benchmark
+            output_parts = []
+            for event in events[turn]:
+                # event is like "D1-waypoint1" or "D1-start-waypoint1"
+                output_parts.append(event)
+
+                destination = event.split("-", 1)[1] if "-" in event else event
+                if destination in self.network.zones:
+                    zone = self.network.zones[destination]
+                    cur = counts.get(destination, 0)
+                    output_parts.append(f": {cur}/{zone.max_drones} drones ")
+                else:
+                    for connection in self.network.connections:
+                        key = f"{connection.zone_a.name}-{connection.zone_b.name}"
+                        if destination == key:
+                            cur = counts.get(destination, 0)
+                            output_parts.append(
+                                f": {cur}/{connection.max_link_capacity} capacity used "
+                            )
+                            break
+
+            if output_parts:
+                print("".join(output_parts))
 
         total_turns = max_turn
         avg_turns = total_turns / self.nb_drones if self.nb_drones else 0.0
@@ -110,20 +136,9 @@ class SimulationEngine:
 
     def _benchmark(self, turn):
         positions = self._drone_positions_at_turn(turn)
-        print(f"**** {positions}")
 
         counts: Dict[str, int] = {}
         for dest in positions.values():
             counts[dest] = counts.get(dest, 0) + 1
 
-        for zone in self.network.zones.values():
-            cur = counts.get(zone.name, 0)
-            print(f"# {zone.name}: {cur}/{zone.max_drones}")
-
-        for connection in self.network.connections:
-            key = f"{connection.zone_a.name}-{connection.zone_b.name}"
-            cur = counts.get(key, 0)
-            print(
-                f"# {connection.zone_a.name}-{connection.zone_b.name}: "
-                f"{cur}/{connection.max_link_capacity}"
-            )
+        return counts
