@@ -75,7 +75,7 @@ class SimulationEngine:
             state_at_turn = None
             for state, arrival in path:
                 if arrival <= turn:
-                    state_at_turn = state
+                    state_at_turn = state 
 
             if state_at_turn:
                 positions[label] = state_at_turn

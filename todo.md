@@ -42,3 +42,13 @@
 - [x] Create `README.md` following the curriculum template.
 - [x] Detail algorithm complexity and optimization strategies.
 - [x] Document AI usage as per instructions.
+
+
+
+<!-- todo.md -->
+## parsing handing: 
+- [x] multiple colors in metadata (multi data)
+- [x] comnts inline #
+- color value error
+- color rainbow
+- color default shouldbe transparent
