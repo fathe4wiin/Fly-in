@@ -47,8 +47,8 @@
 
 <!-- todo.md -->
 ## parsing handing: 
-- [x] multiple colors in metadata (multi data)
-- [x] comnts inline #
-- color value error
-- color rainbow
-- color default shouldbe transparent
+- [x] multiple colors in metadata (multi data) done
+- [x] comnts inline # done 
+- color value error # done
+- color rainbow done # done
+- color default shouldbe transparent # done 

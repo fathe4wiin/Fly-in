@@ -9,6 +9,8 @@ import pygame
 from src.models.network import Network
 from src.models.zone import ZoneType
 from src.visuals.text_render import drone_display_number, render_text
+import time
+import colorsys
 
 # Flip this to True/False to control whether the per-zone F cost overlay
 # (heuristic turns-to-goal, shown next to "max N") is visible when the
@@ -32,8 +34,8 @@ class Visualizer:
 
     def __init__(self, network: Network) -> None:
         self.network = network
-        self.WIDTH = 1920
-        self.HEIGHT = 1080
+        self.WIDTH = 1280
+        self.HEIGHT = 720
         self.PADDING = 60
         self.graph_height = self.HEIGHT - self.CONTROL_BAR_HEIGHT
 
@@ -42,7 +44,7 @@ class Visualizer:
         self.TEXT_COLOR = (220, 220, 230)
         self.DRONE_FILL = (255, 200, 0)
         self.DRONE_RING = (40, 30, 10)
-        self.DEFAULT_HUB_COLOR = (100, 150, 240)
+        self.DEFAULT_HUB_COLOR = (200, 200, 200)
         self.BAR_COLOR = (28, 28, 40)
         self.BTN_COLOR = (65, 70, 95)
         self.BTN_ACTIVE = (120, 140, 200)
@@ -258,8 +260,10 @@ class Visualizer:
                 pygame.draw.circle(self.screen, (255, 50, 50), pos, radius + 4, 2)
             elif zone.z_type == ZoneType.PRIORITY:
                 pygame.draw.circle(self.screen, (50, 255, 50), pos, radius + 4, 2)
-
-            pygame.draw.circle(self.screen, color, pos, radius)
+            if zone.color == "rainbow":
+                pygame.draw.circle(self.screen, self._get_rainbow_rgb(), pos, radius)
+            else:
+                pygame.draw.circle(self.screen, color, pos, radius)
 
             self._blit_text(zone.name, (pos[0], pos[1] + 28), 14,
                             self.TEXT_COLOR, bold=True, center=True)
@@ -461,6 +465,16 @@ class Visualizer:
             bold=self.show_cost_overlay,
         )
 
+    def _get_rainbow_rgb(self, speed: float = 0.5) -> Tuple[int, int, int]:
+            """
+            Returns an (R, G, B) tuple based on current time.
+            Note: self is now included as the first argument.
+            """
+            hue = (time.time() * speed) % 1.0
+            r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+            return int(r * 255), int(g * 255), int(b * 255)
+
+    
     def render(self) -> None:
         graph_rect = pygame.Rect(0, 0, self.WIDTH, self.graph_height)
         self.screen.set_clip(graph_rect)

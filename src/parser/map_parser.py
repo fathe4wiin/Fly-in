@@ -1,6 +1,6 @@
 import re
 from typing import Any, Dict, Set, Tuple
-
+import pygame
 
 class MapParser:
     """Three-phase parser for the Fly-in `.map` file format.
@@ -187,25 +187,20 @@ class MapParser:
             })
 
     def handle_metadata(self) -> None:
-        """Stage 3: Extract bracketed metadata and merge into structured dicts."""
+        """Stage 3: Extract bracketed metadata and validate colors."""
         # Process Zones
-        for name in list(self.structured_data["zones"]):
-            entry = self.structured_data["zones"][name]
+        for name, entry in self.structured_data["zones"].items():
             meta_str = entry.pop("metadata", "").strip()
             ln = entry.get("line", 0)
             if meta_str:
-                # allowed keys for zones
                 allowed = {"zone", "max_drones", "color"}
-                entry.update(self._meta_to_dict(meta_str, allowed, ln))
-
-        # Process Connections
-        for entry in self.structured_data["connections"]:
-            meta_str = entry.pop("metadata", "").strip()
-            ln = entry.get("line", 0)
-            if meta_str:
-                # allowed keys for connections
-                allowed = {"max_link_capacity"}
-                entry.update(self._meta_to_dict(meta_str, allowed, ln))
+                meta_dict = self._meta_to_dict(meta_str, allowed, ln)
+                
+                # COLOR VALIDATION
+                if "color" in meta_dict:
+                    self._validate_color(meta_dict["color"], ln)
+                
+                entry.update(meta_dict)
 
     def _meta_to_dict(self, meta_str: str, allowed_keys: Set[str], line_num: int) -> Dict[str, str]:
         """Helper to transform '[k=v k=v]' string into a dictionary and validate keys.
@@ -213,6 +208,10 @@ class MapParser:
         Ensures every token inside the brackets matches `key=value` and that keys
         are in `allowed_keys`. Raises ValueError with the original line number on error.
         """
+        # Remove trailing comments first
+        if "#" in meta_str:
+            meta_str = meta_str[:meta_str.index("#")].strip()
+        
         if not (meta_str.startswith("[") and meta_str.endswith("]")):
             raise ValueError(f"Line {line_num}: Metadata format Error: {meta_str}")
 
@@ -220,15 +219,31 @@ class MapParser:
         if not content:
             return {}
 
-        tokens = content.split()
+        # Extract all key=value pairs allowing spaces around =
+        pattern = r"(\w+)\s*=\s*(\S+)"
+        matches = re.finditer(pattern, content)
+        
         result: Dict[str, str] = {}
-        for tok in tokens:
-            m = re.fullmatch(r"(\w+)=(\w[\w\d]*)", tok)
-            if not m:
-                raise ValueError(f"Line {line_num}: Invalid metadata token: '{tok}'")
-            k, v = m.group(1), m.group(2)
+        for match in matches:
+            k, v = match.group(1), match.group(2)
             if k not in allowed_keys:
                 raise ValueError(f"Line {line_num}: Invalid metadata key for context: '{k}'")
+            if k in result:
+                raise ValueError(f"Line {line_num}: Duplicate metadata key: '{k}'")
             result[k] = v
 
         return result
+
+    def _validate_color(self, color_val: str, line_num: int) -> None:
+        """Check if color is 'rainbow' or a valid Pygame color."""
+        if color_val.lower() == "rainbow":
+            return
+        
+        try:
+            # pygame.Color() accepts names ('red'), hex ('#FF0000'), etc.
+            pygame.Color(color_val)
+        except (ValueError, TypeError):
+            raise ValueError(
+                f"Line {line_num}: Invalid color '{color_val}'. "
+                "Must be 'rainbow' or a valid Pygame color name code."
+            )
