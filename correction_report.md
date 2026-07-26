@@ -6,6 +6,8 @@
 
 **Overall verdict:** The project is in good shape — parser, capacity/occupancy rules for zones **and connections**, movement-cost mechanics, pathfinding (including the priority-zone tie-break), conflict resolution, and performance all work and comfortably meet the reference benchmarks. All three critical bugs and both documentation gaps identified in the original audit have been fixed; fixing the connection-capacity bug in particular *improved* several performance-benchmark results.
 
+**Post-fix addendum:** In follow-up review, the visualizer's cost overlay was found to be mislabeled: `Visualizer.set_zone_costs()` is fed `pathfinder.h_scores` (the static, precomputed backward-Dijkstra heuristic — turns-to-goal), not a true per-state `f_score` (which also depends on arrival turn, revisit penalties, and occupancy bonus, and so isn't a single per-zone constant). The overlay's on-screen label, the "C" key hint, and the control-bar status text all said "F cost"; they now correctly say "H cost" (the per-zone number displayed next to each hub was already labeled `H:`, so only the toggle-related labels needed changing). `README.md` was updated to match. This was a display-label-only fix — no computation or behavior changed.
+
 ---
 
 ## 🔴 Critical bugs — all fixed
@@ -102,7 +104,7 @@ All three now correctly select the priority branch regardless of alphabetical or
 
 ### 4. README had no dedicated "visual representation" documentation section
 
-**Status: FIXED.** Added a `## Visual Representation` section to `README.md` (between "Key Algorithmic Decisions" and "Output Format") documenting the zone graph layout, zone colors (including animated `rainbow`), restricted/priority rings, capacity labels, drone clustering for large fleets, the F-cost overlay, and playback controls — plus a short "why it helps" paragraph explaining how these features let a reviewer see congestion/capacity/zone-type effects spatially instead of re-deriving them from raw `D<ID>-<zone>` text.
+**Status: FIXED.** Added a `## Visual Representation` section to `README.md` (between "Key Algorithmic Decisions" and "Output Format") documenting the zone graph layout, zone colors (including animated `rainbow`), restricted/priority rings, capacity labels, drone clustering for large fleets, the H-cost overlay, and playback controls — plus a short "why it helps" paragraph explaining how these features let a reviewer see congestion/capacity/zone-type effects spatially instead of re-deriving them from raw `D<ID>-<zone>` text.
 
 ### 5. Most classes and methods were missing docstrings
 
@@ -172,7 +174,7 @@ All now produce messages like `Line 4: Invalid zone type 'weird'. Must be one of
 
   Turns improved on exactly the maps that declare non-default `max_link_capacity` bottlenecks, confirming fix #1 was both correct and impactful; maps without connection-capacity metadata are unaffected, as expected.
 - **Edge cases:** single-drone scenarios, a capacity-limited bottleneck, a disconnected graph, an invalid/undefined-zone connection reference, and zero-capacity zones were all handled gracefully with clear errors or correct output — no crashes, no unhandled exceptions, in any test performed.
-- **Visual representation:** `--visual` launches a pygame window that renders zone colors (including a "rainbow" animated color), a distinct ring around restricted (red) and priority (green) zones, capacity labels, connection capacity labels, an optional F-cost heuristic overlay, and turn-by-turn playback controls — now with a dedicated README section documenting it (fix #4), and no more startup banner noise (fix #2).
+- **Visual representation:** `--visual` launches a pygame window that renders zone colors (including a "rainbow" animated color), a distinct ring around restricted (red) and priority (green) zones, capacity labels, connection capacity labels, an optional H-cost heuristic overlay (labeled "F cost" in the UI until this session — see the fix note above), and turn-by-turn playback controls — now with a dedicated README section documenting it (fix #4), and no more startup banner noise (fix #2).
 - **README structural requirements:** italicized first line with the correct 42-mandated wording, and "Description," "Instructions," "Algorithm explanation," "Visual Representation" (new), and "Resources" (including an AI-usage subsection) sections are all present.
 - **Automated tests:** 27 `unittest`-based tests across `tests/test_parser.py` and `tests/test_capacity.py`, covering valid parsing, error handling (line-numbered), zone/connection capacity, movement costs, and the priority-zone tie-break regression. All pass; run via `make test`.
 - **Live-coding readiness:** no `--capacity-info` flag currently exists (expected, since this is the ad-hoc task to be done live), but the relevant parsing (`network_factory.py`/zone-connection capacity model) and output code (`engine.run()`/`_build_turn_events`) are easy to locate and reasonably well isolated for a quick live modification — and connection capacity data is now actually correct end-to-end (fix #1), so a `--capacity-info` flag built on top of it today would report accurate numbers.

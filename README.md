@@ -185,7 +185,7 @@ make run-visual
 - **Zone-type rings** — `restricted` zones get a red ring, `priority` zones a green ring, making the zones that drive movement-cost and routing decisions visually distinct at a glance, without needing to re-read the map file.
 - **Capacity labels** — zones with `max_drones > 1` are labeled `max N`, and connections with `max_link_capacity > 1` are labeled `C:N`, so bottlenecks and high-capacity shortcuts are immediately obvious.
 - **Drone positions and clustering** — drones are drawn at their current zone (or at the midpoint of a connection while in 2-turn restricted transit) and automatically arranged in a compact grid when many drones share one location, so even a 25-drone fleet sharing the start/end hub stays legible.
-- **F-cost overlay** (toggle with `C`) — displays each zone's precomputed heuristic (turns-to-goal), which is useful for understanding *why* the pathfinder chose the routes it did.
+- **H-cost overlay** (toggle with `C`) — displays each zone's precomputed heuristic (turns-to-goal), which is useful for understanding *why* the pathfinder chose the routes it did.
 - **Turn-by-turn playback controls** — a control bar with first/prev/next/last buttons (or arrow keys / Home / End / Space), a progress bar, and a live readout of the current turn's movement tokens, letting a reviewer step through the exact same output that's printed to the terminal at their own pace.
 
 ### Why it helps
@@ -307,7 +307,7 @@ D3-goal
 
 3. **Visualizer correctness and scalability**:
    - Fixed off-screen rendering of large drone fleets via compact grid layout
-   - Added optional F-cost heuristic overlay for algorithm transparency
+   - Added optional H-cost heuristic overlay for algorithm transparency
 
 4. **Full compliance pass**:
    - Verified parser error coverage against subject requirements

@@ -14,11 +14,11 @@ import colorsys
 import signal
 import types
 
-# Flip this to True/False to control whether the per-zone F cost overlay
+# Flip this to True/False to control whether the per-zone H cost overlay
 # (heuristic turns-to-goal, shown next to "max N") is visible when the
 # visualizer window first opens. Can still be toggled at runtime with the
 # "C" key regardless of this default.
-SHOW_F_COST_ON_START: bool = True
+SHOW_H_COST_ON_START: bool = True
 
 
 class _Button:
@@ -43,7 +43,7 @@ class Visualizer:
 
     Renders the zone graph (with per-zone colors, restricted/priority rings,
     and capacity labels), the drones' turn-by-turn positions, and a control
-    bar with step/playback buttons and an optional F-cost heuristic overlay.
+    bar with step/playback buttons and an optional H-cost heuristic overlay.
     """
 
     CONTROL_BAR_HEIGHT = 72
@@ -93,11 +93,11 @@ class Visualizer:
 
         self._build_buttons()
 
-        # Per-zone F cost (heuristic turns-to-goal) overlay. Starting state
-        # comes from SHOW_F_COST_ON_START at the top of this file; toggle at
+        # Per-zone H cost (heuristic turns-to-goal) overlay. Starting state
+        # comes from SHOW_H_COST_ON_START at the top of this file; toggle at
         # runtime with the "C" key. Populated via set_zone_costs().
         self.zone_costs: Dict[str, float] = {}
-        self.show_cost_overlay: bool = SHOW_F_COST_ON_START
+        self.show_cost_overlay: bool = SHOW_H_COST_ON_START
 
     def _handle_sigs(self, signum: int, frame: types.FrameType | None) -> None:
         """Gracefully close the window on SIGINT/SIGTERM/SIGQUIT."""
@@ -105,7 +105,7 @@ class Visualizer:
         self._quit()
 
     def set_zone_costs(self, zone_costs: Dict[str, float]) -> None:
-        """Provide the per-zone F cost values shown by the cost overlay."""
+        """Provide the per-zone H cost values shown by the cost overlay."""
         self.zone_costs = zone_costs
 
     def _blit_text(
@@ -203,7 +203,7 @@ class Visualizer:
             self._toggle_cost_overlay()
 
     def _toggle_cost_overlay(self) -> None:
-        """Toggle the per-zone F-cost heuristic overlay on/off."""
+        """Toggle the per-zone H-cost heuristic overlay on/off."""
         self.show_cost_overlay = not self.show_cost_overlay
 
     def _on_click(self, pos: Tuple[int, int]) -> None:
@@ -349,7 +349,7 @@ class Visualizer:
 
             if self.show_cost_overlay and zone.name in self.zone_costs:
                 cost = self.zone_costs[zone.name]
-                cost_text = "inf" if cost == float("inf") else f"F:{cost:g}"
+                cost_text = "inf" if cost == float("inf") else f"H:{cost:g}"
                 self._blit_text(
                     cost_text,
                     (pos[0], overlay_y),
@@ -514,7 +514,7 @@ class Visualizer:
             pygame.draw.rect(self.screen, (50, 50, 70), track, border_radius=3)
             pygame.draw.rect(self.screen, self.ACCENT, fill, border_radius=3)
 
-        hint = "← → step   Home/End   Space = forward   C = toggle F cost"
+        hint = "← → step   Home/End   Space = forward   C = toggle H cost"
         hint_surf = render_text(hint, 12, (120, 130, 150))
         self.screen.blit(
             hint_surf,
@@ -527,7 +527,7 @@ class Visualizer:
         cost_state = "ON" if self.show_cost_overlay else "OFF"
         cost_color = (255, 210, 120) if self.show_cost_overlay else (120, 130, 150)
         self._blit_text(
-            f"F cost: {cost_state}",
+            f"H cost: {cost_state}",
             (self.WIDTH - 140, self.graph_height + 34),
             13,
             cost_color,
