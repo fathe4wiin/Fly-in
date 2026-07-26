@@ -103,7 +103,7 @@ Each drone is planned **sequentially** (D1, then D2, etc.) to maximize reuse of 
 
 1. **Heuristic computation** (once per map):
    - Backward Dijkstra from `end_hub` computes per-zone minimum turns-to-goal (`h` value)
-   - Zone type reduces cost: `priority` zones cost 0.8 turns per step, others cost 1
+   - Zone type reduces cost: `priority` zones cost 0.9 turns per step, others cost 1
    - This heuristic is consistent and admissible, powering A* optimality
 
 2. **Forward A\* search per drone**:
@@ -156,12 +156,43 @@ Each drone is planned **sequentially** (D1, then D2, etc.) to maximize reuse of 
 3. **Tie-breaking in A\***:
    - Equal f-scores prefer zones with lower cumulative usage (occupancy bonus)
    - Then prefer paths with fewer hub-to-hub transitions (move_count)
-   - Fall-through to heap insertion order
-   - Averts wasteful detours and clustering
+   - Then prefer the path that spent more of its moves in `priority` zones
+     (a running per-path count of non-priority moves, compared low-to-high),
+     so "priority zones should be preferred" (subject VII.1/VII.3) holds even
+     when two branches are otherwise perfectly tied on cost
+   - Averts wasteful detours, clustering, and arbitrary alphabetical bias
 
 4. **No external graph libraries**:
    - Graph stored as hand-rolled `List[Zone]` and `Dict[str, Connection]`
    - Avoids hidden assumptions and maximizes code clarity
+
+---
+
+## Visual Representation
+
+Fly-in provides an optional graphical replay of the simulation, built with `pygame` (`src/visuals/visualizer.py`). It's enabled with the `--visual` flag:
+
+```bash
+python main.py maps/easy/01_linear_path.txt --visual
+# or
+make run-visual
+```
+
+### What it shows
+
+- **Zone graph layout** — every zone is drawn at its map `(x, y)` coordinate, connected by lines representing each `connection`.
+- **Zone colors** — the `color=` metadata from the map file is rendered directly on each zone (including an animated `color=rainbow` option), so the visual state matches what the map author intended.
+- **Zone-type rings** — `restricted` zones get a red ring, `priority` zones a green ring, making the zones that drive movement-cost and routing decisions visually distinct at a glance, without needing to re-read the map file.
+- **Capacity labels** — zones with `max_drones > 1` are labeled `max N`, and connections with `max_link_capacity > 1` are labeled `C:N`, so bottlenecks and high-capacity shortcuts are immediately obvious.
+- **Drone positions and clustering** — drones are drawn at their current zone (or at the midpoint of a connection while in 2-turn restricted transit) and automatically arranged in a compact grid when many drones share one location, so even a 25-drone fleet sharing the start/end hub stays legible.
+- **F-cost overlay** (toggle with `C`) — displays each zone's precomputed heuristic (turns-to-goal), which is useful for understanding *why* the pathfinder chose the routes it did.
+- **Turn-by-turn playback controls** — a control bar with first/prev/next/last buttons (or arrow keys / Home / End / Space), a progress bar, and a live readout of the current turn's movement tokens, letting a reviewer step through the exact same output that's printed to the terminal at their own pace.
+
+### Why it helps
+
+Because the simulation itself is a purely turn-by-turn algorithm producing a static list of moves, the biggest risk for a human reviewer is *not seeing* congestion, capacity limits, or zone-type effects while reading a wall of `D<ID>-<zone>` text. The visualizer turns that same output into a spatial, replayable scene: capacity bottlenecks are visibly labeled, restricted/priority zones are visually flagged, and drone clustering makes it obvious when many drones share a hub versus when they're spread across parallel routes — all without re-deriving any of it from the map file by hand.
+
+For a terminal-only run (no `--visual`), the same information is available as plain per-turn text (see below); the graphical mode is the enhanced option described by the subject ("colored terminal output and/or a graphical interface").
 
 ---
 

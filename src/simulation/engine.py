@@ -6,12 +6,22 @@ from src.models.network import Network
 
 
 class SimulationEngine:
+    """Plans drone paths and drives the turn-by-turn simulation output."""
+
     def __init__(
         self,
         network: Network,
         nb_drones: int,
         visualizer: Any | None = None,
     ) -> None:
+        """Create the engine for a parsed network.
+
+        Args:
+            network: The network to run the simulation on.
+            nb_drones: Number of drones in the fleet (used for summary stats).
+            visualizer: Optional `Visualizer` instance to replay the plan in;
+                `None` runs terminal-only.
+        """
         self.network = network
         self.nb_drones = nb_drones
         self.visualizer = visualizer
@@ -23,6 +33,18 @@ class SimulationEngine:
             self.visualizer.set_zone_costs(self.pathfinder.h_scores)
 
     def _plan_paths(self) -> None:
+        """Plan a collision-free path per drone, sequentially, into `self.drone_paths`.
+
+        Each drone is planned in turn against the shared reservation table so
+        later drones automatically avoid conflicts with earlier ones. If a
+        drone can't depart at turn 0, its candidate start turn is
+        incremented (up to 200 times) so it effectively "waits" for the
+        network to free up before a full search is retried.
+
+        Raises:
+            ValueError: If the network has no start/end hub, or no valid
+                path could be found for a drone within the retry budget.
+        """
         if self.network.start_zone is None or self.network.end_zone is None:
             raise ValueError("Network must define start_hub and end_hub")
 
@@ -82,6 +104,7 @@ class SimulationEngine:
         return positions
 
     def _build_frames(self, max_turn: int) -> List[Dict[str, str]]:
+        """Build one drone-position snapshot per turn, for visualizer playback."""
         return [self._drone_positions_at_turn(t) for t in range(0, max_turn + 1)]
 
     def run(self) -> None:

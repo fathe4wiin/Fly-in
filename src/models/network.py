@@ -11,6 +11,7 @@ class Network:
     """Hand-rolled graph of zones and connections, plus the drone fleet."""
 
     def __init__(self) -> None:
+        """Create an empty network with no zones, connections, or drones."""
         self.zones: Dict[str, Zone] = {}
         self.connections: List[Connection] = []
         self.drones: List[Drone] = []

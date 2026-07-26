@@ -9,6 +9,13 @@ class ReservationTable:
     """Tracks zone and connection occupancy per simulation turn."""
 
     def __init__(self, network: Network) -> None:
+        """Create an empty reservation table for `network`.
+
+        Args:
+            network: The network whose zones/connections/start/end are used
+                to evaluate occupancy exemptions (start hub at turn 0, end hub
+                always).
+        """
         self.network = network
         self.zone_usage: Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
         self.conn_usage: Dict[int, Dict[Tuple[str, str], int]] = defaultdict(
@@ -23,10 +30,18 @@ class ReservationTable:
         self.zone_total_usage: Dict[str, int] = defaultdict(int)
 
     def _connection_key(self, connection: Connection) -> Tuple[str, str]:
+        """Return a direction-independent key identifying `connection`."""
         name_a, name_b = sorted((connection.zone_a.name, connection.zone_b.name))
         return (name_a, name_b)
 
     def is_zone_available(self, zone_name: str, turn: int, max_cap: int) -> bool:
+        """Check whether a drone can occupy `zone_name` at `turn`.
+
+        The end hub always has room (VII.2: "multiple drones can arrive here
+        and are considered delivered"), and the start hub is exempt from
+        capacity at turn 0 ("all drones begin here and may share the space
+        initially"). Every other zone/turn combination is capped at `max_cap`.
+        """
         if self.network.end_zone and zone_name == self.network.end_zone.name:
             return True
         if (
@@ -38,14 +53,17 @@ class ReservationTable:
         return self.zone_usage[turn][zone_name] < max_cap
 
     def is_connection_available(self, connection: Connection, turn: int) -> bool:
+        """Check whether `connection` still has spare capacity at `turn`."""
         key = self._connection_key(connection)
         return self.conn_usage[turn][key] < connection.max_link_capacity
 
     def reserve_zone(self, zone_name: str, turn: int) -> None:
+        """Record that a drone occupies `zone_name` during `turn`."""
         self.zone_usage[turn][zone_name] += 1
         self.zone_total_usage[zone_name] += 1
 
     def reserve_connection(self, connection: Connection, turn: int) -> None:
+        """Record that a drone traverses `connection` during `turn`."""
         key = self._connection_key(connection)
         self.conn_usage[turn][key] += 1
 

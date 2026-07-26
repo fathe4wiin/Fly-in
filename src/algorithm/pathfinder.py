@@ -2,15 +2,45 @@ import heapq
 from typing import Dict, List, Tuple
 
 from src.models.network import Network
-from src.models.zone import ZoneType
+from src.models.zone import Zone, ZoneType
 from src.algorithm.reservation_table import ReservationTable
 
 
 class SpaceTimeAStar:
+    """Plans a single conflict-free space-time path per drone using A*.
+
+    Each state is a `(zone, turn)` pair. The heuristic is a backward
+    Dijkstra pass from the end hub (see `_precalculate_heuristics`), and
+    zone/connection capacity is checked against a shared `ReservationTable`
+    so later drones automatically avoid conflicts with earlier ones.
+    """
+
     def __init__(self, network: Network, reservation_table: ReservationTable) -> None:
+        """Precompute the goal-distance heuristic for every zone in `network`.
+
+        Args:
+            network: The parsed network of zones/connections/drones to plan over.
+            reservation_table: Shared table tracking zone/connection occupancy
+                across all drones already planned.
+        """
         self.network = network
         self.res_table = reservation_table
         self.h_scores: Dict[str, float] = self._precalculate_heuristics()
+
+    def _non_priority_step(self, zone: Zone) -> int:
+        """1 if entering `zone` does *not* count as using a priority zone, else 0.
+
+        Used as a cumulative tie-break term (see `find_path`): summed over an
+        entire candidate path, it lets two routes with identical cost be
+        compared on how much of the route ran through priority zones, so a
+        genuine tie resolves toward the route using more of them (subject
+        VII.1/VII.3: priority zones "should be prioritized in pathfinding").
+        A single per-step zone-type rank cannot do this, because by the time
+        two full paths reconverge at the goal they compare equal on their
+        *last* zone (the goal itself) regardless of what each path passed
+        through earlier.
+        """
+        return 0 if zone.z_type == ZoneType.PRIORITY else 1
 
     def _precalculate_heuristics(self) -> Dict[str, float]:
         """Backward Dijkstra: minimum turns from each zone to the end hub."""
@@ -76,21 +106,32 @@ class SpaceTimeAStar:
         start_h = self.h_scores.get(start_zone_name, float("inf"))
         # move_count (element 3) tracks how many *actual* hub-to-hub transitions
         # a path has taken (waiting in place never increments it). It sits
-        # between arrival_turn and zone_name in the sort key so that when two
-        # paths are genuinely tied on (f_score, arrival_turn), the one that got
-        # there via fewer real moves wins the tie instead of falling through to
-        # an arbitrary alphabetical comparison of zone names / path contents.
+        # between arrival_turn and non_priority_steps/zone_name in the sort
+        # key so that when two paths are genuinely tied on (f_score,
+        # arrival_turn), the one that got there via fewer real moves wins the
+        # tie. non_priority_steps (element 4) is a running count of real
+        # moves into a *non*-priority zone; it breaks any remaining tie in
+        # favor of the path that spent more of its moves in priority zones
+        # (see _non_priority_step), instead of falling through to an
+        # arbitrary alphabetical comparison of zone names / path contents.
         # This is what makes "just wait one turn for the direct route to clear"
         # beat "detour through an equally-costed neighbor hub" when both
         # options are otherwise identical.
-        pq: List[Tuple[float, int, int, str, List[Tuple[str, int]]]] = [
-            (start_h + start_turn, start_turn, 0, start_zone_name, [(start_zone_name, start_turn)])
+        pq: List[Tuple[float, int, int, int, str, List[Tuple[str, int]]]] = [
+            (
+                start_h + start_turn,
+                start_turn,
+                0,
+                0,
+                start_zone_name,
+                [(start_zone_name, start_turn)],
+            )
         ]
         visited: set[Tuple[str, int]] = set()
         max_turn_limit = 500
 
         while pq:
-            _, current_turn, move_count, u_name, path = heapq.heappop(pq)
+            _, current_turn, move_count, non_priority_steps, u_name, path = heapq.heappop(pq)
 
             if u_name == end_zone_name:
                 return path
@@ -114,13 +155,12 @@ class SpaceTimeAStar:
                 wait_bonus = self._occupancy_bonus(u_name, u_zone.max_drones)
                 heapq.heappush(
                     pq,
-                    (wait_turn +
-                     h +
-                     wait_bonus,
-                     wait_turn,
-                     move_count,
-                     u_name,
-                     new_path))
+                    (wait_turn + h + wait_bonus,  # f_score
+                     wait_turn,  # arrival_turn
+                     move_count,  # move_count
+                     non_priority_steps,  # non_priority_steps
+                     u_name,  # u_name
+                     new_path))  # new_path
 
             for v_zone in self.network.get_neighbors(u_zone):
                 if v_zone.z_type == ZoneType.BLOCKED:
@@ -179,6 +219,16 @@ class SpaceTimeAStar:
                 occupancy_bonus = self._occupancy_bonus(v_zone.name, v_zone.max_drones)
 
                 f_score = arrival_turn + h + revisit_penalty + occupancy_bonus
-                heapq.heappush(pq, (f_score, arrival_turn, move_count + 1, v_zone.name, new_path))
+                heapq.heappush(
+                    pq,
+                    (
+                        f_score,
+                        arrival_turn,
+                        move_count + 1,
+                        non_priority_steps + self._non_priority_step(v_zone),
+                        v_zone.name,
+                        new_path,
+                    ),
+                )
 
         return []

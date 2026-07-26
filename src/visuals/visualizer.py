@@ -22,7 +22,16 @@ SHOW_F_COST_ON_START: bool = True
 
 
 class _Button:
+    """A clickable playback control-bar button (first/prev/next/last)."""
+
     def __init__(self, rect: pygame.Rect, action: str, tooltip: str) -> None:
+        """Create a button.
+
+        Args:
+            rect: Screen rectangle the button occupies.
+            action: Identifier used by click/key handlers to route the action.
+            tooltip: Human-readable description (currently unused for display).
+        """
         self.rect = rect
         self.action = action
         self.tooltip = tooltip
@@ -30,11 +39,23 @@ class _Button:
 
 
 class Visualizer:
+    """Pygame-based graphical replay of a planned simulation.
+
+    Renders the zone graph (with per-zone colors, restricted/priority rings,
+    and capacity labels), the drones' turn-by-turn positions, and a control
+    bar with step/playback buttons and an optional F-cost heuristic overlay.
+    """
+
     CONTROL_BAR_HEIGHT = 72
     BTN_SIZE = 44
     BTN_GAP = 12
 
     def __init__(self, network: Network) -> None:
+        """Open the pygame window and lay out the graph for `network`.
+
+        Args:
+            network: The network whose zones/connections are rendered.
+        """
         self.network = network
         self.WIDTH = 1280
         self.HEIGHT = 720
@@ -79,6 +100,7 @@ class Visualizer:
         self.show_cost_overlay: bool = SHOW_F_COST_ON_START
 
     def _handle_sigs(self, signum: int, frame: types.FrameType | None) -> None:
+        """Gracefully close the window on SIGINT/SIGTERM/SIGQUIT."""
         print(f"Received signal {signum} from {frame}")
         self._quit()
 
@@ -98,6 +120,7 @@ class Visualizer:
         outline: Tuple[int, int, int] | None = None,
         outline_width: int = 2,
     ) -> None:
+        """Render `text` and blit it onto the screen at `pos`."""
         surf = render_text(
             text, size, color, bold=bold, outline=outline, outline_width=outline_width
         )
@@ -108,6 +131,7 @@ class Visualizer:
         self.screen.blit(surf, (x, y))
 
     def _build_buttons(self) -> None:
+        """Lay out the first/prev/next/last playback buttons in the control bar."""
         labels = [
             ("first", "Go to start (Home)"),
             ("prev", "Step back"),
@@ -130,6 +154,14 @@ class Visualizer:
         turn_events: Dict[int, List[str]],
         max_turn: int,
     ) -> None:
+        """Load a planned simulation for playback.
+
+        Args:
+            frames: Per-turn drone-position snapshots (see
+                `SimulationEngine._build_frames`).
+            turn_events: Movement tokens per turn, shown in the control bar.
+            max_turn: The last turn of the simulation.
+        """
         self.frames = frames
         self.turn_events = turn_events
         self.max_turn = max_turn
@@ -138,6 +170,7 @@ class Visualizer:
             self.drone_positions = dict(self.frames[0])
 
     def run_playback(self) -> None:
+        """Run the main event/render loop until the window is closed."""
         while self._running:
             if self.frames:
                 idx = min(self.current_turn, len(self.frames) - 1)
@@ -147,6 +180,7 @@ class Visualizer:
             self.clock.tick(60)
 
     def _process_events(self) -> None:
+        """Dispatch pending pygame events to the relevant handler."""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self._quit()
@@ -156,6 +190,7 @@ class Visualizer:
                 self._on_click(event.pos)
 
     def _on_key(self, key: int) -> None:
+        """Map a key press to the corresponding playback action."""
         if key in (pygame.K_RIGHT, pygame.K_SPACE):
             self._step_forward()
         elif key == pygame.K_LEFT:
@@ -168,9 +203,11 @@ class Visualizer:
             self._toggle_cost_overlay()
 
     def _toggle_cost_overlay(self) -> None:
+        """Toggle the per-zone F-cost heuristic overlay on/off."""
         self.show_cost_overlay = not self.show_cost_overlay
 
     def _on_click(self, pos: Tuple[int, int]) -> None:
+        """Dispatch a mouse click to the button it landed on, if any."""
         for btn in self._buttons:
             if btn.rect.collidepoint(pos):
                 if btn.action == "first":
@@ -184,23 +221,29 @@ class Visualizer:
                 return
 
     def _go_first(self) -> None:
+        """Jump playback to turn 0."""
         self.current_turn = 0
 
     def _go_last(self) -> None:
+        """Jump playback to the final turn."""
         self.current_turn = self.max_turn
 
     def _step_back(self) -> None:
+        """Step playback back one turn, clamped at 0."""
         self.current_turn = max(0, self.current_turn - 1)
 
     def _step_forward(self) -> None:
+        """Step playback forward one turn, clamped at `max_turn`."""
         self.current_turn = min(self.max_turn, self.current_turn + 1)
 
     def _quit(self) -> None:
+        """Close the pygame window and exit the process."""
         self._running = False
         pygame.quit()
         sys.exit(0)
 
     def _calculate_bounds(self) -> None:
+        """Compute the zone coordinate bounds and screen scale factor."""
         if not self.network.zones:
             self.min_x = self.min_y = 0
             self.range_x = self.range_y = 1
@@ -220,11 +263,21 @@ class Visualizer:
         self.scale = min(draw_w / self.range_x, draw_h / self.range_y)
 
     def _to_screen(self, x: int, y: int) -> Tuple[int, int]:
+        """Convert a zone's map coordinates to screen pixel coordinates."""
         screen_x = self.PADDING + (x - self.min_x) * self.scale
         screen_y = self.PADDING + (y - self.min_y) * self.scale
         return (int(screen_x), int(screen_y))
 
     def _connection_midpoint(self, conn_label: str) -> Optional[Tuple[int, int]]:
+        """Return the screen midpoint of the connection named `conn_label`.
+
+        Args:
+            conn_label: A "zoneA-zoneB" transit label (see `SpaceTimeAStar.find_path`).
+
+        Returns:
+            The midpoint in screen coordinates, or `None` if the label
+            doesn't resolve to two known zones.
+        """
         if "-" not in conn_label:
             return None
         parts = conn_label.split("-", 1)
@@ -240,6 +293,7 @@ class Visualizer:
         return ((ax + bx) // 2, (ay + by) // 2)
 
     def _draw_connections(self) -> None:
+        """Draw every connection line, labeling capacity above 1."""
         for conn in self.network.connections:
             start = self._to_screen(conn.zone_a.x, conn.zone_a.y)
             end = self._to_screen(conn.zone_b.x, conn.zone_b.y)
@@ -256,6 +310,7 @@ class Visualizer:
                 )
 
     def _draw_hubs(self) -> None:
+        """Draw every zone: its color, type ring, name, and overlay labels."""
         for zone in self.network.zones.values():
             pos = self._to_screen(zone.x, zone.y)
 
@@ -336,6 +391,7 @@ class Visualizer:
         return offsets
 
     def _draw_drones(self) -> None:
+        """Draw drones at their current positions, clustering ones that share a location."""
         groups: Dict[str, List[str]] = {}
         for d_id, location in self.drone_positions.items():
             groups.setdefault(location, []).append(d_id)
@@ -376,6 +432,7 @@ class Visualizer:
                 )
 
     def _draw_button_icon(self, btn: _Button) -> None:
+        """Draw a control-bar button's background and its directional glyph."""
         color = self.BTN_ACTIVE if btn.hovered else self.BTN_COLOR
         pygame.draw.rect(self.screen, color, btn.rect, border_radius=8)
         pygame.draw.rect(self.screen, self.ACCENT, btn.rect, width=2, border_radius=8)
@@ -422,6 +479,7 @@ class Visualizer:
             pygame.draw.rect(self.screen, self.TEXT_COLOR, (right - 16, cy - 2, 4, 4))
 
     def _draw_control_bar(self) -> None:
+        """Draw the bottom control bar: buttons, turn counter, and progress."""
         bar = pygame.Rect(0, self.graph_height, self.WIDTH, self.CONTROL_BAR_HEIGHT)
         pygame.draw.rect(self.screen, self.BAR_COLOR, bar)
         pygame.draw.line(self.screen, self.ACCENT, (0, self.graph_height),
@@ -477,15 +535,13 @@ class Visualizer:
         )
 
     def _get_rainbow_rgb(self, speed: float = 0.5) -> Tuple[int, int, int]:
-        """
-        Returns an (R, G, B) tuple based on current time.
-        Note: self is now included as the first argument.
-        """
+        """Return an animated (R, G, B) color cycling with wall-clock time."""
         hue = (time.time() * speed) % 1.0
         r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
         return int(r * 255), int(g * 255), int(b * 255)
 
     def render(self) -> None:
+        """Render one full frame: graph area, drones, and control bar."""
         graph_rect = pygame.Rect(0, 0, self.WIDTH, self.graph_height)
         self.screen.set_clip(graph_rect)
         self.screen.fill(self.BG_COLOR)
@@ -498,6 +554,7 @@ class Visualizer:
         pygame.display.flip()
 
     def update(self, drone_positions: Dict[str, str]) -> None:
+        """Set the current drone positions and immediately redraw one frame."""
         self.drone_positions = drone_positions
         self._process_events()
         self.render()

@@ -25,6 +25,16 @@ class Zone:
         max_drones: int,
         color: Optional[str],
     ) -> None:
+        """Create a runtime zone.
+
+        Args:
+            name: Unique zone identifier (no dashes or spaces).
+            x: Integer x-coordinate, used only for visualization layout.
+            y: Integer y-coordinate, used only for visualization layout.
+            z_type: Zone type, which determines movement cost/accessibility.
+            max_drones: Maximum drones allowed in this zone simultaneously.
+            color: Optional display color for visualization.
+        """
         self.name = name
         self.x = x
         self.y = y

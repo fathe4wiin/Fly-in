@@ -21,6 +21,13 @@ _FONT_PATHS = (
 
 @lru_cache(maxsize=32)
 def _load_font(size: int, bold: bool) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Load the first available TTF font at `size`, falling back to PIL's default.
+
+    Args:
+        size: Requested font size in pixels.
+        bold: Currently unused (all candidate paths are pre-selected bold/regular
+            variants); kept for API stability.
+    """
     for path in _FONT_PATHS:
         try:
             return ImageFont.truetype(path, size=size)

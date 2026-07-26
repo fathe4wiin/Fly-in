@@ -1,6 +1,17 @@
+import os
 import re
 from typing import Any, Dict, Set, Tuple
-import pygame
+
+# Must be set before `import pygame`: pygame checks this env var exactly once,
+# at import time, to decide whether to print its "Hello from the pygame
+# community" banner to stdout. Left unset, that banner would print ahead of
+# the simulation's turn-by-turn output (VII.5), corrupting the required
+# line-per-turn output format for anyone piping or diffing it.
+os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
+
+import pygame  # noqa: E402
+
+VALID_ZONE_TYPES = {"normal", "blocked", "restricted", "priority"}
 
 
 class MapParser:
@@ -12,6 +23,11 @@ class MapParser:
     """
 
     def __init__(self, file_path: str) -> None:
+        """Store the path of the map file to be parsed.
+
+        Args:
+            file_path: Path to the `.txt` map file to read.
+        """
         self.file_path = file_path
         self.raw_base: Dict[str, Any] = {}
         self.structured_data: Dict[str, Any] = {}
@@ -131,6 +147,7 @@ class MapParser:
 
         # Process all hubs (including start/end)
         def _unpack_hub(entry: Tuple[str, int]) -> Tuple[str, int]:
+            """Normalize a raw `(value, line_num)` hub entry, defaulting unset ones."""
             if not entry or entry == ("", 0):
                 return ("", 0)
             raw_str, ln = entry
@@ -154,12 +171,24 @@ class MapParser:
                 raise ValueError(f"Line {ln}: Malformed hub definition: {raw_str}")
 
             name = parts[0]
-            x = parts[1]
-            y = parts[2]
+            x_str = parts[1]
+            y_str = parts[2]
             meta = parts[3] if len(parts) > 3 else ""
 
+            if "-" in name or " " in name:
+                raise ValueError(
+                    f"Line {ln}: Zone name '{name}' cannot contain dashes or spaces"
+                )
             if name in self.structured_data["zones"]:
                 raise ValueError(f"Line {ln}: Duplicate zone name: {name}")
+
+            try:
+                x = int(x_str)
+                y = int(y_str)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Line {ln}: Zone coordinates must be integers: '{x_str} {y_str}'"
+                ) from exc
 
             self.structured_data["zones"][name] = {
                 "role": role,
@@ -188,7 +217,7 @@ class MapParser:
             })
 
     def handle_metadata(self) -> None:
-        """Stage 3: Extract bracketed metadata and validate colors."""
+        """Stage 3: Extract bracketed metadata for zones and connections, and validate values."""
         # Process Zones
         for name, entry in self.structured_data["zones"].items():
             meta_str = entry.pop("metadata", "").strip()
@@ -197,11 +226,54 @@ class MapParser:
                 allowed = {"zone", "max_drones", "color"}
                 meta_dict = self._meta_to_dict(meta_str, allowed, ln)
 
-                # COLOR VALIDATION
+                if "zone" in meta_dict and meta_dict["zone"] not in VALID_ZONE_TYPES:
+                    raise ValueError(
+                        f"Line {ln}: Invalid zone type '{meta_dict['zone']}'. "
+                        f"Must be one of: {', '.join(sorted(VALID_ZONE_TYPES))}"
+                    )
+                if "max_drones" in meta_dict:
+                    self._validate_positive_int(meta_dict["max_drones"], "max_drones", ln)
                 if "color" in meta_dict:
                     self._validate_color(meta_dict["color"], ln)
 
                 entry.update(meta_dict)
+
+        # Process Connections
+        for entry in self.structured_data["connections"]:
+            meta_str = entry.pop("metadata", "").strip()
+            ln = entry.get("line", 0)
+            if meta_str:
+                allowed = {"max_link_capacity"}
+                meta_dict = self._meta_to_dict(meta_str, allowed, ln)
+
+                if "max_link_capacity" in meta_dict:
+                    self._validate_positive_int(
+                        meta_dict["max_link_capacity"], "max_link_capacity", ln
+                    )
+
+                entry.update(meta_dict)
+
+    def _validate_positive_int(self, value: str, field_name: str, line_num: int) -> None:
+        """Ensure a metadata value is a positive integer.
+
+        Args:
+            value: The raw string value taken from the metadata block.
+            field_name: Name of the field being validated (used in the error message).
+            line_num: Source line number, included in the raised error for context.
+
+        Raises:
+            ValueError: If `value` is not an integer, or is not strictly positive.
+        """
+        try:
+            parsed = int(value)
+        except ValueError as exc:
+            raise ValueError(
+                f"Line {line_num}: {field_name} must be a positive integer, got '{value}'"
+            ) from exc
+        if parsed <= 0:
+            raise ValueError(
+                f"Line {line_num}: {field_name} must be a positive integer, got '{value}'"
+            )
 
     def _meta_to_dict(self, meta_str: str, allowed_keys: Set[str], line_num: int) -> Dict[str, str]:
         """Helper to transform '[k=v k=v]' string into a dictionary and validate keys.
