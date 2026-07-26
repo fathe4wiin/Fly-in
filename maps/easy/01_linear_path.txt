@@ -2,7 +2,7 @@
 nb_drones: 10
 
 start_hub: start 0 0 [zone    =    normal ]   #awewaewae
-hub: waypoint1 1 0 [color=000000     zone  =  restricted]
+hub: waypoint1 1 0 [color=red     zone  =  restricted]
 hub: waypoint2 2 0 [color=rainbow]
 end_hub: goal 3 0 [color=rainbow]
 

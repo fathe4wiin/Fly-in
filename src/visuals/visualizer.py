@@ -11,6 +11,8 @@ from src.models.zone import ZoneType
 from src.visuals.text_render import drone_display_number, render_text
 import time
 import colorsys
+import signal
+import types
 
 # Flip this to True/False to control whether the per-zone F cost overlay
 # (heuristic turns-to-goal, shown next to "max N") is visible when the
@@ -63,6 +65,11 @@ class Visualizer:
         self.max_turn = 0
         self._buttons: List[_Button] = []
         self._running = True
+
+        signal.signal(signal.SIGINT, self._handle_sigs)
+        signal.signal(signal.SIGTERM, self._handle_sigs)
+        signal.signal(signal.SIGQUIT, self._handle_sigs)
+
         self._build_buttons()
 
         # Per-zone F cost (heuristic turns-to-goal) overlay. Starting state
@@ -70,6 +77,10 @@ class Visualizer:
         # runtime with the "C" key. Populated via set_zone_costs().
         self.zone_costs: Dict[str, float] = {}
         self.show_cost_overlay: bool = SHOW_F_COST_ON_START
+
+    def _handle_sigs(self, signum: int, frame: types.FrameType | None) -> None:
+        print(f"Received signal {signum} from {frame}")
+        self._quit()
 
     def set_zone_costs(self, zone_costs: Dict[str, float]) -> None:
         """Provide the per-zone F cost values shown by the cost overlay."""
@@ -466,15 +477,14 @@ class Visualizer:
         )
 
     def _get_rainbow_rgb(self, speed: float = 0.5) -> Tuple[int, int, int]:
-            """
-            Returns an (R, G, B) tuple based on current time.
-            Note: self is now included as the first argument.
-            """
-            hue = (time.time() * speed) % 1.0
-            r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
-            return int(r * 255), int(g * 255), int(b * 255)
+        """
+        Returns an (R, G, B) tuple based on current time.
+        Note: self is now included as the first argument.
+        """
+        hue = (time.time() * speed) % 1.0
+        r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+        return int(r * 255), int(g * 255), int(b * 255)
 
-    
     def render(self) -> None:
         graph_rect = pygame.Rect(0, 0, self.WIDTH, self.graph_height)
         self.screen.set_clip(graph_rect)

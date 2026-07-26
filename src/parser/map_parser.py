@@ -2,6 +2,7 @@ import re
 from typing import Any, Dict, Set, Tuple
 import pygame
 
+
 class MapParser:
     """Three-phase parser for the Fly-in `.map` file format.
 
@@ -195,11 +196,11 @@ class MapParser:
             if meta_str:
                 allowed = {"zone", "max_drones", "color"}
                 meta_dict = self._meta_to_dict(meta_str, allowed, ln)
-                
+
                 # COLOR VALIDATION
                 if "color" in meta_dict:
                     self._validate_color(meta_dict["color"], ln)
-                
+
                 entry.update(meta_dict)
 
     def _meta_to_dict(self, meta_str: str, allowed_keys: Set[str], line_num: int) -> Dict[str, str]:
@@ -211,7 +212,7 @@ class MapParser:
         # Remove trailing comments first
         if "#" in meta_str:
             meta_str = meta_str[:meta_str.index("#")].strip()
-        
+
         if not (meta_str.startswith("[") and meta_str.endswith("]")):
             raise ValueError(f"Line {line_num}: Metadata format Error: {meta_str}")
 
@@ -222,7 +223,7 @@ class MapParser:
         # Extract all key=value pairs allowing spaces around =
         pattern = r"(\w+)\s*=\s*(\S+)"
         matches = re.finditer(pattern, content)
-        
+
         result: Dict[str, str] = {}
         for match in matches:
             k, v = match.group(1), match.group(2)
@@ -238,7 +239,7 @@ class MapParser:
         """Check if color is 'rainbow' or a valid Pygame color."""
         if color_val.lower() == "rainbow":
             return
-        
+
         try:
             # pygame.Color() accepts names ('red'), hex ('#FF0000'), etc.
             pygame.Color(color_val)
