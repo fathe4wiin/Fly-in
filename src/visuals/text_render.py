@@ -20,13 +20,16 @@ _FONT_PATHS = (
 
 
 @lru_cache(maxsize=32)
-def _load_font(size: int, bold: bool) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    """Load the first available TTF font at `size`, falling back to PIL's default.
+def _load_font(
+        size: int,
+        bold: bool) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Load the first available TTF font at `size`, falling back to PIL's
+    default.
 
     Args:
         size: Requested font size in pixels.
-        bold: Currently unused (all candidate paths are pre-selected bold/regular
-            variants); kept for API stability.
+        bold: Currently unused (all candidate paths are pre-selected
+            bold/regular variants); kept for API stability.
     """
     for path in _FONT_PATHS:
         try:
@@ -62,7 +65,8 @@ def render_text(
             for dy in range(-outline_width, outline_width + 1):
                 if dx == 0 and dy == 0:
                     continue
-                draw.text((ox + dx, oy + dy), text, font=font, fill=outline[:3] + (255,))
+                draw.text((ox + dx, oy + dy), text, font=font,
+                          fill=outline[:3] + (255,))
         draw.text((ox, oy), text, font=font, fill=rgb + (255,))
     else:
         bbox = font.getbbox(text)

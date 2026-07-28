@@ -28,12 +28,17 @@ class Network:
                 neighbors.append(connection.zone_a)
         return neighbors
 
-    def get_connection(self, zone_a: Zone, zone_b: Zone) -> Optional[Connection]:
+    def get_connection(
+            self,
+            zone_a: Zone,
+            zone_b: Zone) -> Optional[Connection]:
         """Return the connection between `zone_a` and `zone_b`, if any."""
         for connection in self.connections:
             if (
-                (connection.zone_a == zone_a and connection.zone_b == zone_b)
-                or (connection.zone_a == zone_b and connection.zone_b == zone_a)
+                (connection.zone_a == zone_a
+                 and connection.zone_b == zone_b)
+                or (connection.zone_a == zone_b
+                    and connection.zone_b == zone_a)
             ):
                 return connection
         return None
@@ -59,14 +64,22 @@ class NetworkModel(BaseModel):
         # 2. Validate connection endpoints
         for conn in self.connections:
             if conn.node_a not in self.zones:
-                raise ValueError(f"Connection references undefined zone: {conn.node_a}")
+                raise ValueError(
+                    f"Connection references undefined zone: {conn.node_a}"
+                )
             if conn.node_b not in self.zones:
-                raise ValueError(f"Connection references undefined zone: {conn.node_b}")
+                raise ValueError(
+                    f"Connection references undefined zone: {conn.node_b}"
+                )
             if conn.node_a == conn.node_b:
-                raise ValueError(f"Self-connection detected on zone: {conn.node_a}")
+                raise ValueError(
+                    f"Self-connection detected on zone: {conn.node_a}")
 
         # 3. Coordinate collision check
-        coords = [z.x for z in self.zones.values()], [z.y for z in self.zones.values()]
+        coords = (
+            [z.x for z in self.zones.values()],
+            [z.y for z in self.zones.values()],
+        )
         points = list(zip(*coords))
         if len(points) != len(set(points)):
             raise ValueError("Multiple zones share the same coordinates")

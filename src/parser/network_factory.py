@@ -6,7 +6,8 @@ from src.models.connection import Connection, ConnectionModel
 from src.models.drone import Drone
 
 
-def create_network(model_or_structured: Union[NetworkModel, Dict[str, Any]]) -> Network:
+def create_network(
+        model_or_structured: Union[NetworkModel, Dict[str, Any]]) -> Network:
     """Create a runtime `Network` from either a `NetworkModel` or the
     parser's structured dictionary.
 
@@ -48,7 +49,10 @@ def create_network(model_or_structured: Union[NetworkModel, Dict[str, Any]]) -> 
             )
 
         nb = int(sd.get("nb_drones", 1)) if sd.get("nb_drones") else 1
-        model = NetworkModel(nb_drones=nb, zones=zones, connections=connections)
+        model = NetworkModel(
+            nb_drones=nb,
+            zones=zones,
+            connections=connections)
 
     # At this point `model` is a validated NetworkModel
     network = Network()
@@ -83,7 +87,8 @@ def create_network(model_or_structured: Union[NetworkModel, Dict[str, Any]]) -> 
     # instantiate drones and place them at the start hub
     if model.nb_drones:
         if network.start_zone is None:
-            raise ValueError("Cannot place drones: no start_zone defined in network")
+            raise ValueError(
+                "Cannot place drones: no start_zone defined in network")
         for i in range(model.nb_drones):
             drone = Drone(drone_id=str(i + 1), start_zone=network.start_zone)
             network.drones.append(drone)

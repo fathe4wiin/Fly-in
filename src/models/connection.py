@@ -5,7 +5,8 @@ from pydantic import BaseModel, PositiveInt, Field
 class Connection:
     """Runtime representation of a bidirectional edge between two zones."""
 
-    def __init__(self, zone_a: Zone, zone_b: Zone, max_link_capacity: int) -> None:
+    def __init__(self, zone_a: Zone, zone_b: Zone,
+                 max_link_capacity: int) -> None:
         """Create a connection between two zones.
 
         Args:

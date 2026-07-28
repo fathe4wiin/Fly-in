@@ -17,24 +17,32 @@ class ReservationTable:
                 always).
         """
         self.network = network
-        self.zone_usage: Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self.zone_usage: Dict[int, Dict[str, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )
         self.conn_usage: Dict[int, Dict[Tuple[str, str], int]] = defaultdict(
             lambda: defaultdict(int)
         )
-        # Cumulative reservations per zone across *all* turns. Unlike zone_usage
-        # (which is keyed per turn and only says whether a zone is full at one
-        # specific instant), this tracks whether a zone is already part of an
-        # established route at all, regardless of which turn each drone passes
-        # through it. Used to bias tie-breaks toward reusing hubs that already
-        # have capacity committed instead of spilling into untouched ones.
+        # Cumulative reservations per zone across *all* turns. Unlike
+        # zone_usage (which is keyed per turn and only says whether a zone
+        # is full at one specific instant), this tracks whether a zone is
+        # already part of an established route at all, regardless of which
+        # turn each drone passes through it. Used to bias tie-breaks toward
+        # reusing hubs that already have capacity committed instead of
+        # spilling into untouched ones.
         self.zone_total_usage: Dict[str, int] = defaultdict(int)
 
     def _connection_key(self, connection: Connection) -> Tuple[str, str]:
         """Return a direction-independent key identifying `connection`."""
-        name_a, name_b = sorted((connection.zone_a.name, connection.zone_b.name))
+        name_a, name_b = sorted(
+            (connection.zone_a.name, connection.zone_b.name))
         return (name_a, name_b)
 
-    def is_zone_available(self, zone_name: str, turn: int, max_cap: int) -> bool:
+    def is_zone_available(
+            self,
+            zone_name: str,
+            turn: int,
+            max_cap: int) -> bool:
         """Check whether a drone can occupy `zone_name` at `turn`.
 
         The end hub always has room (VII.2: "multiple drones can arrive here
@@ -52,7 +60,10 @@ class ReservationTable:
             return True
         return self.zone_usage[turn][zone_name] < max_cap
 
-    def is_connection_available(self, connection: Connection, turn: int) -> bool:
+    def is_connection_available(
+            self,
+            connection: Connection,
+            turn: int) -> bool:
         """Check whether `connection` still has spare capacity at `turn`."""
         key = self._connection_key(connection)
         return self.conn_usage[turn][key] < connection.max_link_capacity
@@ -73,7 +84,8 @@ class ReservationTable:
         if "-" not in label:
             return None
         zone_a_name, zone_b_name = label.split("-", 1)
-        if zone_a_name not in self.network.zones or zone_b_name not in self.network.zones:
+        if (zone_a_name not in self.network.zones
+                or zone_b_name not in self.network.zones):
             return None
         return self.network.get_connection(
             self.network.zones[zone_a_name], self.network.zones[zone_b_name]

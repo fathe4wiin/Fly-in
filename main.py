@@ -8,7 +8,8 @@ from src.simulation.engine import SimulationEngine
 
 def main() -> None:
     """Parse CLI arguments, run the simulation, and report errors cleanly."""
-    parser = argparse.ArgumentParser(description="Fly-in drone routing simulation")
+    parser = argparse.ArgumentParser(
+        description="Fly-in drone routing simulation")
     parser.add_argument("map_file", help="Path to a .txt map file")
     parser.add_argument(
         "--visual",

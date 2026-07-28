@@ -42,7 +42,8 @@ class MapParser:
         """Stage 1: Categorize lines into raw strings based on prefix."""
         start_hubs = 0
         end_hubs = 0
-        # store raw values along with their source line numbers for better errors
+        # store raw values along with their source line numbers for better
+        # errors
         self.raw_base = {
             "nb_drones": ("", 0),
             "start_hub_raw": ("", 0),
@@ -69,11 +70,13 @@ class MapParser:
                 if prefix == "nb_drones":
                     # must be defined only once
                     if self.raw_base["nb_drones"][0]:
-                        raise ValueError(f"Line {line_num}: Multiple nb_drones definitions")
+                        raise ValueError(
+                            f"Line {line_num}: Multiple nb_drones definitions")
                     self.raw_base["nb_drones"] = (value, line_num)
                 elif prefix == "start_hub":
                     if start_hubs > 0:
-                        raise ValueError(f"Line {line_num}: Multiple start hubs")
+                        raise ValueError(
+                            f"Line {line_num}: Multiple start hubs")
                     start_hubs += 1
                     self.raw_base["start_hub_raw"] = (value, line_num)
                     # register name immediately for ordering checks
@@ -94,18 +97,21 @@ class MapParser:
                     if name:
                         encountered_zones.add(name)
                 elif prefix == "connection":
-                    # validate connection references appear after zone definitions
+                    # validate connection references appear after zone
+                    # definitions
                     parts = value.split("-", 1)
                     if len(parts) < 2:
-                        raise ValueError(f"Line {line_num}: Malformed connection '{value}'")
+                        raise ValueError(
+                            f"Line {line_num}: Malformed connection '{value}'")
                     node_a = parts[0].strip()
                     remaining = parts[1].split(maxsplit=1)
                     node_b = remaining[0].strip()
 
-                    if node_a not in encountered_zones or node_b not in encountered_zones:
+                    if (node_a not in encountered_zones
+                            or node_b not in encountered_zones):
                         raise ValueError(
-                            f"Line {line_num}: Connection references undefined "
-                            f"zone(s): {node_a},{node_b}"
+                            f"Line {line_num}: Connection references "
+                            f"undefined zone(s): {node_a},{node_b}"
                         )
 
                     edge_key = tuple(sorted((node_a, node_b)))
@@ -119,7 +125,8 @@ class MapParser:
 
                     self.raw_base["connections_raw"].append((value, line_num))
                 else:
-                    raise ValueError(f"Line {line_num}: Unknown prefix '{prefix}'")
+                    raise ValueError(
+                        f"Line {line_num}: Unknown prefix '{prefix}'")
 
         if not self.raw_base["nb_drones"][0]:
             raise ValueError("Missing nb_drones definition")
@@ -128,7 +135,8 @@ class MapParser:
                 raise ValueError
         except ValueError as exc:
             ln = self.raw_base["nb_drones"][1]
-            raise ValueError(f"Line {ln}: nb_drones must be a positive integer") from exc
+            raise ValueError(
+                f"Line {ln}: nb_drones must be a positive integer") from exc
 
         if start_hubs == 0:
             raise ValueError("Missing start_hub definition")
@@ -138,7 +146,8 @@ class MapParser:
     def parse_phase_two(self) -> None:
         """Stage 2: Split strings into coordinate and name components."""
         raw_nb_drones = self.raw_base["nb_drones"]
-        nb_drones = raw_nb_drones[0] if isinstance(raw_nb_drones, tuple) else raw_nb_drones
+        nb_drones = raw_nb_drones[0] if isinstance(
+            raw_nb_drones, tuple) else raw_nb_drones
         self.structured_data = {
             "nb_drones": nb_drones,
             "zones": {},
@@ -147,18 +156,21 @@ class MapParser:
 
         # Process all hubs (including start/end)
         def _unpack_hub(entry: Tuple[str, int]) -> Tuple[str, int]:
-            """Normalize a raw `(value, line_num)` hub entry, defaulting unset ones."""
+            """Normalize a raw `(value, line_num)` hub entry, defaulting
+            unset ones."""
             if not entry or entry == ("", 0):
                 return ("", 0)
             raw_str, ln = entry
             return (raw_str, ln)
 
         all_hubs = []
-        if self.raw_base["start_hub_raw"] and self.raw_base["start_hub_raw"] != ("", 0):
-            s_raw, s_ln = _unpack_hub(self.raw_base["start_hub_raw"])
+        start_hub_raw = self.raw_base["start_hub_raw"]
+        if start_hub_raw and start_hub_raw != ("", 0):
+            s_raw, s_ln = _unpack_hub(start_hub_raw)
             all_hubs.append(("start", s_raw, s_ln))
-        if self.raw_base["end_hub_raw"] and self.raw_base["end_hub_raw"] != ("", 0):
-            e_raw, e_ln = _unpack_hub(self.raw_base["end_hub_raw"])
+        end_hub_raw = self.raw_base["end_hub_raw"]
+        if end_hub_raw and end_hub_raw != ("", 0):
+            e_raw, e_ln = _unpack_hub(end_hub_raw)
             all_hubs.append(("end", e_raw, e_ln))
         for h_raw, h_ln in self.raw_base["hubs_raw"]:
             all_hubs.append(("normal", h_raw, h_ln))
@@ -168,7 +180,8 @@ class MapParser:
                 continue
             parts = raw_str.split(maxsplit=3)
             if len(parts) < 3:
-                raise ValueError(f"Line {ln}: Malformed hub definition: {raw_str}")
+                raise ValueError(
+                    f"Line {ln}: Malformed hub definition: {raw_str}")
 
             name = parts[0]
             x_str = parts[1]
@@ -177,8 +190,8 @@ class MapParser:
 
             if "-" in name or " " in name:
                 raise ValueError(
-                    f"Line {ln}: Zone name '{name}' cannot contain dashes or spaces"
-                )
+                    f"Line {ln}: Zone name '{name}' cannot contain dashes "
+                    "or spaces")
             if name in self.structured_data["zones"]:
                 raise ValueError(f"Line {ln}: Duplicate zone name: {name}")
 
@@ -187,8 +200,8 @@ class MapParser:
                 y = int(y_str)
             except ValueError as exc:
                 raise ValueError(
-                    f"Line {ln}: Zone coordinates must be integers: '{x_str} {y_str}'"
-                ) from exc
+                    f"Line {ln}: Zone coordinates must be integers: "
+                    f"'{x_str} {y_str}'") from exc
 
             self.structured_data["zones"][name] = {
                 "role": role,
@@ -202,7 +215,8 @@ class MapParser:
         for raw_conn, ln in self.raw_base["connections_raw"]:
             parts = raw_conn.split("-", 1)
             if len(parts) < 2:
-                raise ValueError(f"Line {ln}: Malformed connection line: {raw_conn}")
+                raise ValueError(
+                    f"Line {ln}: Malformed connection line: {raw_conn}")
 
             node_a = parts[0].strip()
             remaining = parts[1].split(maxsplit=1)
@@ -217,7 +231,8 @@ class MapParser:
             })
 
     def handle_metadata(self) -> None:
-        """Stage 3: Extract bracketed metadata for zones and connections, and validate values."""
+        """Stage 3: Extract bracketed metadata for zones and connections,
+        and validate values."""
         # Process Zones
         for name, entry in self.structured_data["zones"].items():
             meta_str = entry.pop("metadata", "").strip()
@@ -226,13 +241,15 @@ class MapParser:
                 allowed = {"zone", "max_drones", "color"}
                 meta_dict = self._meta_to_dict(meta_str, allowed, ln)
 
-                if "zone" in meta_dict and meta_dict["zone"] not in VALID_ZONE_TYPES:
+                zone_type = meta_dict.get("zone")
+                if zone_type is not None and zone_type not in VALID_ZONE_TYPES:
+                    valid_types = ", ".join(sorted(VALID_ZONE_TYPES))
                     raise ValueError(
-                        f"Line {ln}: Invalid zone type '{meta_dict['zone']}'. "
-                        f"Must be one of: {', '.join(sorted(VALID_ZONE_TYPES))}"
-                    )
+                        f"Line {ln}: Invalid zone type '{zone_type}'. "
+                        f"Must be one of: {valid_types}")
                 if "max_drones" in meta_dict:
-                    self._validate_positive_int(meta_dict["max_drones"], "max_drones", ln)
+                    self._validate_positive_int(
+                        meta_dict["max_drones"], "max_drones", ln)
                 if "color" in meta_dict:
                     self._validate_color(meta_dict["color"], ln)
 
@@ -253,40 +270,53 @@ class MapParser:
 
                 entry.update(meta_dict)
 
-    def _validate_positive_int(self, value: str, field_name: str, line_num: int) -> None:
+    def _validate_positive_int(
+            self,
+            value: str,
+            field_name: str,
+            line_num: int) -> None:
         """Ensure a metadata value is a positive integer.
 
         Args:
             value: The raw string value taken from the metadata block.
-            field_name: Name of the field being validated (used in the error message).
-            line_num: Source line number, included in the raised error for context.
+            field_name: Name of the field being validated (used in the
+                error message).
+            line_num: Source line number, included in the raised error for
+                context.
 
         Raises:
-            ValueError: If `value` is not an integer, or is not strictly positive.
+            ValueError: If `value` is not an integer, or is not strictly
+                positive.
         """
         try:
             parsed = int(value)
         except ValueError as exc:
             raise ValueError(
-                f"Line {line_num}: {field_name} must be a positive integer, got '{value}'"
+                f"Line {line_num}: {field_name} must be a positive "
+                f"integer, got '{value}'"
             ) from exc
         if parsed <= 0:
             raise ValueError(
-                f"Line {line_num}: {field_name} must be a positive integer, got '{value}'"
-            )
+                f"Line {line_num}: {field_name} must be a positive "
+                f"integer, got '{value}'")
 
-    def _meta_to_dict(self, meta_str: str, allowed_keys: Set[str], line_num: int) -> Dict[str, str]:
-        """Helper to transform '[k=v k=v]' string into a dictionary and validate keys.
+    def _meta_to_dict(
+        self, meta_str: str, allowed_keys: Set[str], line_num: int
+    ) -> Dict[str, str]:
+        """Helper to transform '[k=v k=v]' string into a dictionary and
+        validate keys.
 
-        Ensures every token inside the brackets matches `key=value` and that keys
-        are in `allowed_keys`. Raises ValueError with the original line number on error.
+        Ensures every token inside the brackets matches `key=value` and
+        that keys are in `allowed_keys`. Raises ValueError with the
+        original line number on error.
         """
         # Remove trailing comments first
         if "#" in meta_str:
             meta_str = meta_str[:meta_str.index("#")].strip()
 
         if not (meta_str.startswith("[") and meta_str.endswith("]")):
-            raise ValueError(f"Line {line_num}: Metadata format Error: {meta_str}")
+            raise ValueError(
+                f"Line {line_num}: Metadata format Error: {meta_str}")
 
         content = meta_str[1:-1].strip()
         if not content:
@@ -300,9 +330,12 @@ class MapParser:
         for match in matches:
             k, v = match.group(1), match.group(2)
             if k not in allowed_keys:
-                raise ValueError(f"Line {line_num}: Invalid metadata key for context: '{k}'")
+                raise ValueError(
+                    f"Line {line_num}: Invalid metadata key for context: "
+                    f"'{k}'")
             if k in result:
-                raise ValueError(f"Line {line_num}: Duplicate metadata key: '{k}'")
+                raise ValueError(
+                    f"Line {line_num}: Duplicate metadata key: '{k}'")
             result[k] = v
 
         return result

@@ -33,7 +33,8 @@ class SimulationEngine:
             self.visualizer.set_zone_costs(self.pathfinder.h_scores)
 
     def _plan_paths(self) -> None:
-        """Plan a collision-free path per drone, sequentially, into `self.drone_paths`.
+        """Plan a collision-free path per drone, sequentially, into
+        `self.drone_paths`.
 
         Each drone is planned in turn against the shared reservation table so
         later drones automatically avoid conflicts with earlier ones. If a
@@ -55,11 +56,13 @@ class SimulationEngine:
             path: List[Tuple[str, int]] = []
             start_turn = 0
             while not path and start_turn < 200:
-                path = self.pathfinder.find_path(start_name, end_name, start_turn)
+                path = self.pathfinder.find_path(
+                    start_name, end_name, start_turn)
                 if not path:
                     start_turn += 1
             if not path:
-                raise ValueError(f"No valid path found for drone D{drone.drone_id}")
+                raise ValueError(
+                    f"No valid path found for drone D{drone.drone_id}")
             self.res_table.reserve_path(path)
             self.drone_paths[drone.drone_id] = path
 
@@ -104,11 +107,16 @@ class SimulationEngine:
         return positions
 
     def _build_frames(self, max_turn: int) -> List[Dict[str, str]]:
-        """Build one drone-position snapshot per turn, for visualizer playback."""
-        return [self._drone_positions_at_turn(t) for t in range(0, max_turn + 1)]
+        """Build one drone-position snapshot per turn, for visualizer
+        playback."""
+        return [
+            self._drone_positions_at_turn(t)
+            for t in range(0, max_turn + 1)
+        ]
 
     def run(self) -> None:
-        """Plan paths, simulate turn-by-turn, and print subject output format."""
+        """Plan paths, simulate turn-by-turn, and print subject output
+        format."""
         self._plan_paths()
         events = self._build_turn_events()
 

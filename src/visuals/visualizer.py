@@ -122,8 +122,12 @@ class Visualizer:
     ) -> None:
         """Render `text` and blit it onto the screen at `pos`."""
         surf = render_text(
-            text, size, color, bold=bold, outline=outline, outline_width=outline_width
-        )
+            text,
+            size,
+            color,
+            bold=bold,
+            outline=outline,
+            outline_width=outline_width)
         x, y = pos
         if center:
             x -= surf.get_width() // 2
@@ -131,16 +135,19 @@ class Visualizer:
         self.screen.blit(surf, (x, y))
 
     def _build_buttons(self) -> None:
-        """Lay out the first/prev/next/last playback buttons in the control bar."""
+        """Lay out the first/prev/next/last playback buttons in the
+        control bar."""
         labels = [
             ("first", "Go to start (Home)"),
             ("prev", "Step back"),
             ("next", "Step forward"),
             ("last", "Go to end (End)"),
         ]
-        total_w = len(labels) * self.BTN_SIZE + (len(labels) - 1) * self.BTN_GAP
+        total_w = len(labels) * self.BTN_SIZE + \
+            (len(labels) - 1) * self.BTN_GAP
         start_x = (self.WIDTH - total_w) // 2
-        y = self.HEIGHT - self.CONTROL_BAR_HEIGHT + (self.CONTROL_BAR_HEIGHT - self.BTN_SIZE) // 2
+        y = self.HEIGHT - self.CONTROL_BAR_HEIGHT + \
+            (self.CONTROL_BAR_HEIGHT - self.BTN_SIZE) // 2
         self._buttons = []
         x = start_x
         for action, tip in labels:
@@ -268,11 +275,13 @@ class Visualizer:
         screen_y = self.PADDING + (y - self.min_y) * self.scale
         return (int(screen_x), int(screen_y))
 
-    def _connection_midpoint(self, conn_label: str) -> Optional[Tuple[int, int]]:
+    def _connection_midpoint(
+            self, conn_label: str) -> Optional[Tuple[int, int]]:
         """Return the screen midpoint of the connection named `conn_label`.
 
         Args:
-            conn_label: A "zoneA-zoneB" transit label (see `SpaceTimeAStar.find_path`).
+            conn_label: A "zoneA-zoneB" transit label (see
+                `SpaceTimeAStar.find_path`).
 
         Returns:
             The midpoint in screen coordinates, or `None` if the label
@@ -300,7 +309,8 @@ class Visualizer:
             pygame.draw.line(self.screen, self.CONN_COLOR, start, end, 2)
 
             if conn.max_link_capacity > 1:
-                mid_x, mid_y = (start[0] + end[0]) // 2, (start[1] + end[1]) // 2
+                mid_x, mid_y = (
+                    start[0] + end[0]) // 2, (start[1] + end[1]) // 2
                 self._blit_text(
                     f"C:{conn.max_link_capacity}",
                     (mid_x, mid_y),
@@ -323,11 +333,14 @@ class Visualizer:
 
             radius = 20
             if zone.z_type == ZoneType.RESTRICTED:
-                pygame.draw.circle(self.screen, (255, 50, 50), pos, radius + 4, 2)
+                pygame.draw.circle(
+                    self.screen, (255, 50, 50), pos, radius + 4, 2)
             elif zone.z_type == ZoneType.PRIORITY:
-                pygame.draw.circle(self.screen, (50, 255, 50), pos, radius + 4, 2)
+                pygame.draw.circle(
+                    self.screen, (50, 255, 50), pos, radius + 4, 2)
             if zone.color == "rainbow":
-                pygame.draw.circle(self.screen, self._get_rainbow_rgb(), pos, radius)
+                pygame.draw.circle(
+                    self.screen, self._get_rainbow_rgb(), pos, radius)
             else:
                 pygame.draw.circle(self.screen, color, pos, radius)
 
@@ -373,7 +386,8 @@ class Visualizer:
             return 9
         return 7
 
-    def _cluster_offsets(self, count: int, spacing: int) -> List[Tuple[int, int]]:
+    def _cluster_offsets(
+            self, count: int, spacing: int) -> List[Tuple[int, int]]:
         """Bounded grid layout (roughly square) centered on the hub position.
 
         Replaces a naive single-column vertical stack, which pushes drones
@@ -391,7 +405,8 @@ class Visualizer:
         return offsets
 
     def _draw_drones(self) -> None:
-        """Draw drones at their current positions, clustering ones that share a location."""
+        """Draw drones at their current positions, clustering ones that
+        share a location."""
         groups: Dict[str, List[str]] = {}
         for d_id, location in self.drone_positions.items():
             groups.setdefault(location, []).append(d_id)
@@ -414,9 +429,12 @@ class Visualizer:
             for d_id, (dx, dy) in zip(d_ids, offsets):
                 cx, cy = pos[0] + dx, pos[1] + dy
 
-                pygame.draw.circle(self.screen, self.DRONE_RING, (cx, cy), radius + 2)
-                pygame.draw.circle(self.screen, self.DRONE_FILL, (cx, cy), radius)
-                pygame.draw.circle(self.screen, (255, 255, 255), (cx, cy), radius, width=2)
+                pygame.draw.circle(
+                    self.screen, self.DRONE_RING, (cx, cy), radius + 2)
+                pygame.draw.circle(
+                    self.screen, self.DRONE_FILL, (cx, cy), radius)
+                pygame.draw.circle(
+                    self.screen, (255, 255, 255), (cx, cy), radius, width=2)
 
                 number = drone_display_number(d_id)
                 font_size = min(20 if len(number) <= 2 else 16, radius + 4)
@@ -435,52 +453,63 @@ class Visualizer:
         """Draw a control-bar button's background and its directional glyph."""
         color = self.BTN_ACTIVE if btn.hovered else self.BTN_COLOR
         pygame.draw.rect(self.screen, color, btn.rect, border_radius=8)
-        pygame.draw.rect(self.screen, self.ACCENT, btn.rect, width=2, border_radius=8)
+        pygame.draw.rect(
+            self.screen,
+            self.ACCENT,
+            btn.rect,
+            width=2,
+            border_radius=8)
 
         cx, cy = btn.rect.centerx, btn.rect.centery
         s = 10
         if btn.action == "first":
             left = btn.rect.left
             pygame.draw.polygon(
-                self.screen,
-                self.TEXT_COLOR,
-                [(left + 14, cy), (left + 14 + s, cy - s), (left + 14 + s, cy + s)],
+                self.screen, self.TEXT_COLOR,
+                [(left + 14, cy), (left + 14 + s, cy - s),
+                 (left + 14 + s, cy + s)],
             )
             pygame.draw.polygon(
-                self.screen,
-                self.TEXT_COLOR,
-                [(left + 26, cy), (left + 26 + s, cy - s), (left + 26 + s, cy + s)],
+                self.screen, self.TEXT_COLOR,
+                [(left + 26, cy), (left + 26 + s, cy - s),
+                 (left + 26 + s, cy + s)],
             )
-            pygame.draw.rect(self.screen, self.TEXT_COLOR, (left + 12, cy - 2, 4, 4))
+            pygame.draw.rect(self.screen, self.TEXT_COLOR,
+                             (left + 12, cy - 2, 4, 4))
         elif btn.action == "prev":
             pygame.draw.polygon(
-                self.screen,
-                self.TEXT_COLOR,
-                [(cx - s // 2, cy), (cx + s // 2, cy - s), (cx + s // 2, cy + s)],
+                self.screen, self.TEXT_COLOR,
+                [(cx - s // 2, cy), (cx + s // 2, cy - s),
+                 (cx + s // 2, cy + s)],
             )
         elif btn.action == "next":
             pygame.draw.polygon(
-                self.screen,
-                self.TEXT_COLOR,
-                [(cx + s // 2, cy), (cx - s // 2, cy - s), (cx - s // 2, cy + s)],
+                self.screen, self.TEXT_COLOR,
+                [(cx + s // 2, cy), (cx - s // 2, cy - s),
+                 (cx - s // 2, cy + s)],
             )
         elif btn.action == "last":
             right = btn.rect.right
             pygame.draw.polygon(
-                self.screen,
-                self.TEXT_COLOR,
-                [(right - 14, cy), (right - 14 - s, cy - s), (right - 14 - s, cy + s)],
+                self.screen, self.TEXT_COLOR,
+                [(right - 14, cy), (right - 14 - s, cy - s),
+                 (right - 14 - s, cy + s)],
             )
             pygame.draw.polygon(
-                self.screen,
-                self.TEXT_COLOR,
-                [(right - 26, cy), (right - 26 - s, cy - s), (right - 26 - s, cy + s)],
+                self.screen, self.TEXT_COLOR,
+                [(right - 26, cy), (right - 26 - s, cy - s),
+                 (right - 26 - s, cy + s)],
             )
-            pygame.draw.rect(self.screen, self.TEXT_COLOR, (right - 16, cy - 2, 4, 4))
+            pygame.draw.rect(self.screen, self.TEXT_COLOR,
+                             (right - 16, cy - 2, 4, 4))
 
     def _draw_control_bar(self) -> None:
         """Draw the bottom control bar: buttons, turn counter, and progress."""
-        bar = pygame.Rect(0, self.graph_height, self.WIDTH, self.CONTROL_BAR_HEIGHT)
+        bar = pygame.Rect(
+            0,
+            self.graph_height,
+            self.WIDTH,
+            self.CONTROL_BAR_HEIGHT)
         pygame.draw.rect(self.screen, self.BAR_COLOR, bar)
         pygame.draw.line(self.screen, self.ACCENT, (0, self.graph_height),
                          (self.WIDTH, self.graph_height), 2)
@@ -505,12 +534,15 @@ class Visualizer:
             move_text = "(initial positions)"
         else:
             move_text = "(no movement this turn)"
-        self._blit_text(move_text[:90], (24, self.graph_height + 34), 13, (160, 170, 190))
+        self._blit_text(
+            move_text[:90], (24, self.graph_height + 34), 13, (160, 170, 190))
 
         if self.max_turn > 0:
             progress = self.current_turn / self.max_turn
             track = pygame.Rect(24, self.HEIGHT - 14, self.WIDTH - 48, 6)
-            fill = pygame.Rect(track.x, track.y, int(track.w * progress), track.h)
+            fill = pygame.Rect(
+                track.x, track.y, int(
+                    track.w * progress), track.h)
             pygame.draw.rect(self.screen, (50, 50, 70), track, border_radius=3)
             pygame.draw.rect(self.screen, self.ACCENT, fill, border_radius=3)
 
@@ -525,7 +557,13 @@ class Visualizer:
              10))
 
         cost_state = "ON" if self.show_cost_overlay else "OFF"
-        cost_color = (255, 210, 120) if self.show_cost_overlay else (120, 130, 150)
+        cost_color = (
+            255,
+            210,
+            120) if self.show_cost_overlay else (
+            120,
+            130,
+            150)
         self._blit_text(
             f"H cost: {cost_state}",
             (self.WIDTH - 140, self.graph_height + 34),
