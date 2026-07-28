@@ -256,44 +256,23 @@ The `junction` zone has `max_drones=2`, so only D1 and D2 can occupy it on turn 
 ├── Makefile                         # Build and development tasks
 ├── requirements.txt                 # Python dependencies
 ├── README.md                        # This file
-├── how_it_works.md                  # Detailed architecture walkthrough
-├── parsing.md                       # Parser requirements checklist
-├── parsing_changes.md               # Parser implementation notes
-├── splitting_analysis.md            # Multi-route decision analysis
-├── session_changes.md               # AI-assisted changes and verification
 │
-├── src/
-│   ├── __init__.py
-│   ├── algorithm/
-│   │   ├── pathfinder.py            # Space-time A* implementation
-│   │   └── reservation_table.py     # Conflict tracking
-│   ├── models/
-│   │   ├── network.py               # Graph structure
-│   │   ├── zone.py                  # Zone (hub) definition
-│   │   ├── connection.py            # Edge between zones
-│   │   └── drone.py                 # Drone agent
-│   ├── parser/
-│   │   ├── map_parser.py            # `.txt` → structured data
-│   │   └── network_factory.py       # Structured data → OOP objects
-│   └── simulation/
-│       └── engine.py                # Turn-by-turn execution
-│
-└── maps/
-    ├── README.md                    # Challenge map descriptions
-    ├── easy/
-    │   ├── 01_linear_path.txt
-    │   ├── 02_simple_fork.txt
-    │   └── 03_basic_capacity.txt
-    ├── medium/
-    │   ├── 01_dead_end_trap.txt
-    │   ├── 02_circular_loop.txt
-    │   └── 03_priority_puzzle.txt
-    ├── hard/
-    │   ├── 01_maze_nightmare.txt
-    │   ├── 02_capacity_hell.txt
-    │   └── 03_ultimate_challenge.txt
-    └── challenger/
-        └── 01_the_impossible_dream.txt
+└── src/
+    ├── __init__.py
+    ├── algorithm/
+    │   ├── pathfinder.py            # Space-time A* implementation
+    │   └── reservation_table.py     # Conflict tracking
+    ├── models/
+    │   ├── network.py               # Graph structure
+    │   ├── zone.py                  # Zone (hub) definition
+    │   ├── connection.py            # Edge between zones
+    │   └── drone.py                 # Drone agent
+    ├── parser/
+    │   ├── map_parser.py            # `.txt` → structured data
+    │   └── network_factory.py       # Structured data → OOP objects
+    └── simulation/
+        └── engine.py                # Turn-by-turn execution
+ 
 ```
 
 ---
@@ -308,45 +287,8 @@ The `junction` zone has `max_drones=2`, so only D1 and D2 can occupy it on turn 
 - **Pydantic documentation** — [Pydantic v2](https://docs.pydantic.dev/latest/) for validation and serialization
 - **Pygame documentation** — [Pygame Docs](https://www.pygame.org/docs/) for visualization
 
-### Project Documentation
-
-- `how_it_works.md` — Detailed walkthrough of the architecture and data flow
-- `parsing.md` — Map parser requirements and validation rules
-- `parsing_changes.md` — Enhancements made to the parser
-- `splitting_analysis.md` — Analysis of multi-route behavior (why certain parallel paths are not used)
-- `maps/README.md` — Challenge map descriptions and difficulty rankings
-- `en.subject.pdf` — Official 42 project specification (movement rules, scoring, constraints)
-
 ### AI Usage
 
-**Tasks assisted by AI:**
-
-1. **Parser hardening** (`parsing_changes.md`)
-   - Structured multi-phase parsing with line-number error reporting
-   - Metadata validation with regex and context-specific key whitelisting
-
-2. **Space-time A* structure and correctness fixes**:
-   - Initial pathfinding framework for `(zone, turn)` state space
-   - **Unfair tie-breaking fix**: Added occupancy bonus to prevent alphabet-based clustering of equal-cost routes
-   - **In-flight state fix**: Made restricted-zone 2-turn transits explicit with intermediate `zoneA-zoneB` labels
-   - **Capacity check fix**: Added missing `is_zone_available` check on retried drone starts to prevent capacity violations
-   - **Heuristic pruning fix**: Removed overly strict filter that permanently banned otherwise-competitive routes from being explored
-
-3. **Visualizer correctness and scalability**:
-   - Fixed off-screen rendering of large drone fleets via compact grid layout
-   - Added optional H-cost heuristic overlay for algorithm transparency
-
-4. **Full compliance pass**:
-   - Verified parser error coverage against subject requirements
-   - Code cleanup: flake8 and mypy compliance, including `--strict` mode
-   - Makefile targets and build automation
-
-**Verification method:**
-
-All AI-suggested changes were verified against the official subject text and cross-checked with concrete test runs:
-- **Capacity scans** across all 10 provided maps (easy, medium, hard, challenger)
-- **Turn-by-turn traces** of drone movements to ensure correctness
-- **Byte-for-byte output comparison** before/after each fix to isolate behavioral changes
-- **Performance benchmarks** to confirm no regressions
-
-See `session_changes.md` for a complete change log with verification details.
+* **Parsing & Error Handling:** Multi-phase parser hardening, line-specific error reporting, and metadata validation via regex and key whitelisting.
+* **Space-Time A* Core:** `(zone, turn)` state-space implementation and algorithmic fixes for occupancy tie-breaking, in-flight transit labels, start-zone capacity checks, and heuristic pruning.
+* **Visualization:** UI/UX layout design, real-time simulation state rendering.
